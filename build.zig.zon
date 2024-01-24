@@ -1,0 +1,15 @@
+.{
+    .name = "raygreet",
+    .version = "0.1.0",
+
+    .dependencies = .{
+        .cova = .{
+            .url = "https://github.com/00JCIV00/cova/archive/19dcf0655af8dff4d55a9012a557984ffbe9f674.tar.gz",
+            .hash = "1220a8b06d4d91ff6e260794fc2a8f729f8c8713c3006611926f3e5dad915e97b36d",
+        },
+    },
+
+    .paths = .{
+        "",
+    },
+}

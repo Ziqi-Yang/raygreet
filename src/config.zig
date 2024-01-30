@@ -9,7 +9,7 @@ const Config = @This();
 window_name: []const u8 = "RayGreet",
 fps: u8 = 60,
 
-const CONFIG_FILE_PATH = "/etc/greetd/raygreet.json";
+pub const CONFIG_FILE_PATH = "/etc/greetd/raygreet.json";
 
 pub fn parse_config(allocator: std.mem.Allocator) !Config {
     return parse_config_file(allocator, CONFIG_FILE_PATH);
@@ -44,7 +44,7 @@ test "parse config" {
         path
     );
 
-    try std.testing.expectEqual(30, my_json.fps);
     try std.testing.expectEqualStrings("RayGreet", my_json.window_name);
+    try std.testing.expectEqual(30, my_json.fps);
 }
 

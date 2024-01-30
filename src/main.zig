@@ -4,10 +4,9 @@ const log = std.log;
 const builtin = @import("builtin");
 const r = @cImport(@cInclude("raylib.h"));
 const cova = @import("cova");
-const screen_input_user = @import("screen/input_user.zig");
-
-const WINDOW_NAME = "RayGreet";
-const FPS = 60;
+const config = @import("config.zig");
+const screen = @import("screen.zig");
+const RayGreetScreen = screen.RayGreetScreen;
 
 // override default log settings
 pub const std_options = struct {
@@ -47,19 +46,27 @@ pub fn main() !void {
     
     // if (builtin.mode == .Debug) try cova.utils.displayCmdInfo(CommandT, &main_cmd, allocator, &stdout);
 
+    log.info("Reading configuration at {s}", .{config.CONFIG_FILE_PATH});
+    const CONFIG = try config.parse_config(allocator);
+    
     // initialize screen
     const WINDOW_WIDTH = r.GetScreenWidth();
     const WINDOW_HEIGHT = r.GetScreenHeight();
-    r.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_NAME);
-    r.SetTargetFPS(FPS);
+    r.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, @ptrCast(CONFIG.window_name));
+    r.SetTargetFPS(CONFIG.fps);
     defer r.CloseWindow();
+
+    var input_user_screen = screen.InputUserScreen { };
+    // var input_password_screen = screen.InputPasswordScreen {};
+    // _ = input_password_screen;
+
+    const current_screen = RayGreetScreen{
+        .input_user_screen = &input_user_screen,
+    };
 
     while (!r.WindowShouldClose()) {
         r.BeginDrawing();
-        r.ClearBackground(r.RAYWHITE);
-        {
-            r.DrawText("El Psy Kongaroo", 40, 40, 40, r.GRAY);
-        }
+        try current_screen.draw();
         r.EndDrawing();
     }
 }

@@ -4,6 +4,7 @@ const log = std.log;
 const builtin = @import("builtin");
 const r = @cImport(@cInclude("raylib.h"));
 const cova = @import("cova");
+const screen_input_user = @import("screen/input_user.zig");
 
 const WINDOW_NAME = "RayGreet";
 const FPS = 60;
@@ -33,9 +34,10 @@ pub fn main() !void {
     
     const stdout = std.io.getStdOut().writer();
 
+    // parse arguments
     const main_cmd = try setup_cmd.init(allocator, .{});
     defer main_cmd.deinit();
-    
+
     var args_iter = try cova.ArgIteratorGeneric.init(allocator);
     defer args_iter.deinit();
     cova.parseArgs(&args_iter, CommandT, &main_cmd, stdout, .{}) catch |err| switch (err) {
@@ -46,8 +48,10 @@ pub fn main() !void {
     // if (builtin.mode == .Debug) try cova.utils.displayCmdInfo(CommandT, &main_cmd, allocator, &stdout);
 
     // initialize screen
-    r.InitWindow(r.GetScreenWidth(), r.GetScreenHeight(), WINDOW_NAME);
-    r.SetTargetFPS(60);
+    const WINDOW_WIDTH = r.GetScreenWidth();
+    const WINDOW_HEIGHT = r.GetScreenHeight();
+    r.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_NAME);
+    r.SetTargetFPS(FPS);
     defer r.CloseWindow();
 
     while (!r.WindowShouldClose()) {

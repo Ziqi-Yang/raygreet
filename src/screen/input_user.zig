@@ -1,24 +1,23 @@
 const std = @import("std");
 const r = @cImport(@cInclude("raylib.h"));
-const text_input_field = @import("../component/text_input_field.zig");
+const InputTextField = @import("../component/input_text_field.zig");
+const Vector2 = @import("../util.zig").Vector2;
+const Cursor = @import("../component/cursor.zig").Cursor;
 
 const InputUserScreen = @This();
 
+input_text_field: InputTextField = undefined,
+
+pub fn new(screen_size: Vector2) !InputUserScreen {
+    const cursor: Cursor = .{
+        .color = r.GRAY,
+    };
+    return .{
+        .input_text_field = try InputTextField.new(screen_size, cursor)
+    };
+}
+
 pub fn draw(self: *InputUserScreen) !void {
-    _ = self;
     r.ClearBackground(r.RAYWHITE);
-    const font = r.GetFontDefault();
-    _ = font;
-    r.DrawText("Input User Screen", 100, 40, 100, r.GRAY);
-    
-    // const res = r.MeasureTextEx(font, "W", 100, 0);
-    // std.debug.print("{any}\n", .{res});
-    // std.debug.print("{any}\n", .{r.MeasureText("Input User Screen", 50)});
-
-    // var cursor: @import("../component/cursor.zig").Cursor = .{
-    //     .color = r.GRAY,
-    // };
-    // const fz = text_input_field.getMaxFontSizeWithWidthLimit(3200, "Hello", &cursor);
-    // std.debug.print("{d}\n", .{fz});
-
+    self.input_text_field.draw(Vector2 {.x = 0, .y = 0});
 }

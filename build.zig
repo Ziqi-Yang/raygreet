@@ -70,7 +70,7 @@ pub fn build(b: *std.Build) !void {
 
     // test command ========================================
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/component/text_input_field.zig" },
+        .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });

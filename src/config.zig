@@ -18,7 +18,7 @@ pub fn parse_config(allocator: std.mem.Allocator) !Config {
 
 fn parse_config_file(allocator: std.mem.Allocator, path: []const u8) !Config {
     const file = fs.openFileAbsolute(path, .{}) catch |err| switch (err) {
-        error.FileNotFound => unreachable,
+        error.FileNotFound => return Config {},
         else => return err
     };
     const config_json = try file.readToEndAlloc(allocator, 1 << 10);
@@ -29,6 +29,7 @@ fn parse_config_file(allocator: std.mem.Allocator, path: []const u8) !Config {
     });
 }
 
+// NOTE: test it with `pwd` == project root
 test "parse config" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -37,7 +38,7 @@ test "parse config" {
         allocator,
         &.{
             try std.fs.cwd().realpathAlloc(allocator, "."),
-            "../test/config.json"
+            "test/config.json"
         }
     );
     const my_json = try parse_config_file(

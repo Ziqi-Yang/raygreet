@@ -1,4 +1,3 @@
-// src/main.zig
 const std = @import("std");
 const log = std.log;
 const builtin = @import("builtin");
@@ -7,8 +6,7 @@ const cova = @import("cova");
 const config = @import("config.zig");
 const screen = @import("screen.zig");
 const RayGreetScreen = screen.RayGreetScreen;
-const util = @import("util.zig");
-const Size = util.Size;
+const Vector2 = @import("util.zig").Vector2;
 
 // override default log settings
 pub const std_options = struct {
@@ -50,7 +48,7 @@ pub fn main() !void {
 
     log.info("Reading configuration at {s}", .{config.CONFIG_FILE_PATH});
     const CONFIG = try config.parse_config(allocator);
-    
+
     // initialize screen
     
     // std.debug.print("{}", .{@TypeOf(.{WINDOW_WIDTH, WINDOW_HEIGHT})});
@@ -60,12 +58,12 @@ pub fn main() !void {
     const SCREEN_WIDTH = r.GetScreenWidth();
     const SCREEN_HEIGHT = r.GetScreenHeight();
     
-    const size: Size = .{@intCast(SCREEN_WIDTH), @intCast(SCREEN_HEIGHT)};
-    _ = size;
+    const screen_size: Vector2 = .{
+        .x = @floatFromInt(SCREEN_WIDTH),
+        .y = @floatFromInt(SCREEN_HEIGHT)
+    };
 
-    var input_user_screen = screen.InputUserScreen { };
-    // var input_password_screen = screen.InputPasswordScreen {};
-    // _ = input_password_screen;
+    var input_user_screen = try screen.InputUserScreen.new(screen_size);
 
     const current_screen = RayGreetScreen{
         .input_user_screen = &input_user_screen,
@@ -77,3 +75,10 @@ pub fn main() !void {
         r.EndDrawing();
     }
 }
+
+test {
+    const _config = @import("config.zig");
+    _ = _config;
+    std.testing.refAllDecls(@This());
+}
+

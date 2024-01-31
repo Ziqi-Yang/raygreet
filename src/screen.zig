@@ -1,3 +1,4 @@
+const std = @import("std");
 pub const InputUserScreen = @import("screen/input_user.zig");
 pub const InputPasswordScreen = @import("screen/input_password.zig");
 

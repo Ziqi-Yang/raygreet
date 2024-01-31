@@ -7,6 +7,8 @@ const cova = @import("cova");
 const config = @import("config.zig");
 const screen = @import("screen.zig");
 const RayGreetScreen = screen.RayGreetScreen;
+const util = @import("util.zig");
+const Size = util.Size;
 
 // override default log settings
 pub const std_options = struct {
@@ -50,11 +52,16 @@ pub fn main() !void {
     const CONFIG = try config.parse_config(allocator);
     
     // initialize screen
-    const WINDOW_WIDTH = r.GetScreenWidth();
-    const WINDOW_HEIGHT = r.GetScreenHeight();
-    r.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, @ptrCast(CONFIG.window_name));
-    r.SetTargetFPS(CONFIG.fps);
+    
+    // std.debug.print("{}", .{@TypeOf(.{WINDOW_WIDTH, WINDOW_HEIGHT})});
+    r.InitWindow(0, 0, @ptrCast(CONFIG.window_name));
     defer r.CloseWindow();
+    r.SetTargetFPS(CONFIG.fps);
+    const SCREEN_WIDTH = r.GetScreenWidth();
+    const SCREEN_HEIGHT = r.GetScreenHeight();
+    
+    const size: Size = .{@intCast(SCREEN_WIDTH), @intCast(SCREEN_HEIGHT)};
+    _ = size;
 
     var input_user_screen = screen.InputUserScreen { };
     // var input_password_screen = screen.InputPasswordScreen {};

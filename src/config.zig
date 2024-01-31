@@ -8,6 +8,7 @@ const Config = @This();
 
 window_name: []const u8 = "RayGreet",
 fps: u8 = 60,
+input_text_size_base: u8 = 100,
 
 pub const CONFIG_FILE_PATH = "/etc/greetd/raygreet.json";
 

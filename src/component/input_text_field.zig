@@ -6,8 +6,11 @@ const r = @cImport(@cInclude("raylib.h"));
 
 const InputTextField = @This();
 
-_previous_text: []const u8,
-text: []const u8,
+const MAX_TEXT_LEN = 255;
+const SPACING_RATIO: f16 = 0.1; // spacing = text_size * spacing_ratio
+
+text: [MAX_TEXT_LEN: '\x00']u8 = [_: '\x00']u8{'\x00'} ** MAX_TEXT_LEN,
+_text_index: u8 = 0,
 font: r.Font,
 font_size: u16,
 box_size: Vector2,
@@ -16,17 +19,13 @@ color: r.Color,
 cursor: Cursor,
 cursor_offset: Vector2,
 
-const spacing_ratio: f16 = 0.1; // spacing = text_size * spacing_ratio
 
 /// box_size: the size of the box that the input text field is in
 /// this function must be called after raylib window initialization (to get
 /// default font)
 pub fn new(box_size: Vector2, cursor: Cursor) !InputTextField {
     if (!r.IsWindowReady()) return error.WindowNotInitialized;
-    const initial_text = "";
     var input_text_field = InputTextField {
-        ._previous_text = initial_text,
-        .text = initial_text,
         .font = r.GetFontDefault(),
         .font_size = undefined,
         .box_size = box_size,
@@ -41,10 +40,11 @@ pub fn new(box_size: Vector2, cursor: Cursor) !InputTextField {
 }
 
 fn autoSetFontSize(self: *InputTextField) void {
-    const font_size = getPreferredFontSize(self.box_size, self.font, self.text, &self.cursor);
+    const text = &self.text;
+    const font_size = getPreferredFontSize(self.box_size, self.font, text, &self.cursor);
     self.font_size = font_size;
     
-    const text_size = measureInputTextFieldSize(self.text, &self.cursor, self.font, font_size);
+    const text_size = measureInputTextFieldSize(text, &self.cursor, self.font, font_size);
     
     const offset_x = (self.box_size.x - text_size.x) / 2;
     const offset_y = (self.box_size.y - text_size.y) / 2;
@@ -99,7 +99,7 @@ fn getMaxFontSizeWithWidthLimit(width_limit: f16, font: r.Font, text: []const u8
 
 fn measureInputTextFieldSize(text: []const u8, cursor: *const Cursor, font: r.Font, font_size: u16) Vector2 {
     const font_size_f16: f16 = @floatFromInt(font_size);
-    const spacing = font_size_f16 * spacing_ratio;
+    const spacing = font_size_f16 * SPACING_RATIO;
     const width = width: {
         var width: f32 = cursor.calculateSize(font_size).x;
         if (!std.mem.eql(u8, text, "")) {
@@ -120,27 +120,47 @@ fn measureInputTextFieldSize(text: []const u8, cursor: *const Cursor, font: r.Fo
     };
 }
 
+/// return whether push success (the reason to fail: size full)
+pub fn push(self: *InputTextField, char: u8) bool {
+    if (self._text_index >= self.text.len) {
+        return false;
+    } 
+    self.text[self._text_index] = char;
+    self._text_index += 1;
+    self.autoSetFontSize();
+    return true;
+}
+
+/// return whether pop success (the reason to fail: size empty)
+pub fn pop(self: *InputTextField) bool {
+    if (self._text_index == 0) {
+        return false;
+    }
+    self._text_index -= 1;
+    self.text[self._text_index] = '\x00';
+    self.autoSetFontSize();
+    return true;
+}
+
 /// outer_offset: position of the box that Input Text Filed is in
 pub fn draw(self: *InputTextField, outer_offset: Vector2) void {
+    const text = &self.text;
+    // std.debug.print("{s}\n", .{text});
     const position = outer_offset.add(&self.offset);
     const position_r = r.Vector2 {
         .x = position.x,
         .y = position.y
     };
     const cursor_position = outer_offset.add(&self.cursor_offset);
-    
-    // if text changed, set font size
-    if (!std.mem.eql(u8, self.text, self._previous_text)) {
-        self.autoSetFontSize();
-        self._previous_text = self.text;
-    }
+
+    // std.debug.print(">{}\n", .{cursor_position});
     
     r.DrawTextEx(
         self.font,
-        @ptrCast(self.text),
+        @ptrCast(text),
         position_r,
         @floatFromInt(self.font_size),
-        @as(f16, @floatFromInt(self.font_size)) * spacing_ratio,
+        @as(f16, @floatFromInt(self.font_size)) * SPACING_RATIO,
         self.color
     );
 

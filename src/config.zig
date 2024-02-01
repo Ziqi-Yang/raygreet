@@ -3,12 +3,18 @@
 const std = @import("std");
 const json = std.json;
 const fs = std.fs;
+const CursorType = @import("component/cursor.zig").CursorType;
 
 const Config = @This();
 
+pub const CursorOption = struct {
+    blink: u8 = 0,
+    type: CursorType = CursorType.Bar
+};
+
 window_name: []const u8 = "RayGreet",
 fps: u8 = 60,
-input_text_size_base: u8 = 100,
+cursor: CursorOption = CursorOption {},
 
 pub const CONFIG_FILE_PATH = "/etc/greetd/raygreet.json";
 
@@ -48,5 +54,7 @@ test "parse config" {
 
     try std.testing.expectEqualStrings("RayGreet", my_json.window_name);
     try std.testing.expectEqual(30, my_json.fps);
+    try std.testing.expectEqual(0, my_json.cursor.blink);
+    try std.testing.expectEqual(CursorType.Hbar, my_json.cursor.type);
 }
 

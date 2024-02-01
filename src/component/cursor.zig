@@ -4,10 +4,11 @@ const Vector2 = @import("../util.zig").Vector2;
 pub const Cursor = struct {
     _show: bool = true,
     _frame_counter: u8 = 0,
+    /// don't directly set size
+    size: Vector2 = .{.x = 1.0, .y = 1.0},
     color: r.Color,
     /// per num frame changes hide/show status (0 means no blink)
     blink: u8 = 0,
-    size: Vector2 = .{.x = 1.0, .y = 1.0},
     type: CursorType = CursorType.Bar,
 
     pub fn setSize(self: *Cursor, font_size: u16) Vector2 {

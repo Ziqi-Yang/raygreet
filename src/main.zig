@@ -1,3 +1,4 @@
+// FIXME: Vector2 to be @Vector(2, f16)
 const std = @import("std");
 const log = std.log;
 const builtin = @import("builtin");
@@ -63,7 +64,7 @@ pub fn main() !void {
         .y = @floatFromInt(SCREEN_HEIGHT)
     };
 
-    var input_user_screen = try screen.InputUserScreen.new(screen_size);
+    var input_user_screen = try screen.InputUserScreen.new(screen_size, CONFIG.cursor, CONFIG.fps, 0.1);
 
     const current_screen = RayGreetScreen{
         .input_user_screen = &input_user_screen,

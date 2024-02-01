@@ -1,3 +1,6 @@
 {
-  "fps": 30
+  "fps": 30,
+  "cursor": {
+    "type": "Hbar"
+  }
 }

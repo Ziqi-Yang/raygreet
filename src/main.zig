@@ -82,10 +82,20 @@ pub fn main() !void {
 }
 
 fn handleKey() void {
-    // Raylib Bug: IsKeyPressed(r.KEY_CAPS_LOCK) doesn't work properly, so
-    // handle keys using `r.GetKeyPressed`
     const key = r.GetKeyPressed();
+    // note: most condition pass, however, when you press 'a' and then 'alt', then
+    // release 'alt' key, you still see the blink cursor.
+    status.pressedKey = if (key != 0)  @intCast(key) else key: {
+        if (status.pressedKey == null
+                or (r.IsKeyUp(@intCast(status.pressedKey.?)))) {
+            break :key null;
+        } else {
+            break :key status.pressedKey;
+        }
+    };
     switch (key) {
+        // Raylib Bug: IsKeyPressed(r.KEY_CAPS_LOCK) doesn't work properly, so
+        // handle keys using `r.GetKeyPressed`
         r.KEY_CAPS_LOCK => {
             status.capsLockOn = !status.capsLockOn;
             log.info("status.capsLockOn: {}\n", .{status.capsLockOn});

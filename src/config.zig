@@ -14,6 +14,7 @@ pub const Config = struct {
     _frames_per_key_down: u8 = undefined,
     window_name: []const u8 = "RayGreet",
     fps: u8 = 60,
+    /// seconds
     keydown_speed: f16 = 0.1,
     cursor: CursorOption = CursorOption {},
 
@@ -21,12 +22,15 @@ pub const Config = struct {
     pub fn calculateFields(self: *Config) *Config {
         const fps: f16 = @floatFromInt(self.fps);
         self._frames_per_key_down = @intFromFloat(fps * self.keydown_speed);
+        self.cursor._blink = @intFromFloat(fps * self.cursor.blink_speed);
         return self;
     }
 };
 
 pub const CursorOption = struct {
-    blink: u8 = 0,
+    _blink: u8 = undefined,
+    /// seconds 
+    blink_speed: f16 = 0.6,
     type: CursorType = CursorType.Bar
 };
 
@@ -60,11 +64,6 @@ fn parse_config_file(allocator: std.mem.Allocator, path: []const u8) !Config {
         .ignore_unknown_fields = true
     });
     return config.calculateFields().*;
-}
-
-/// calculate indirect fields
-fn initializeConfig(self: *Config) Config {
-    _ = self;
 }
 
 // NOTE: test it with `pwd` == project root

@@ -1,5 +1,6 @@
 const r = @cImport(@cInclude("raylib.h"));
 const Vector2 = @import("../util.zig").Vector2;
+const status = @import("../status.zig");
 
 pub const Cursor = struct {
     _show: bool = true,
@@ -26,16 +27,26 @@ pub const Cursor = struct {
         };
     }
 
+    pub fn resetBlinkFrameCounter(self: *Cursor) void {
+        self._frame_counter = 0;
+    }
+
     pub fn draw(self: *Cursor, position: *const Vector2) void {
-        if (self.blink != 0) {
-            self._frame_counter = (self._frame_counter + 1) % self.blink;
-            if (self._frame_counter == 0) {
-                self._show = !self._show;
-            }
-            if (!self._show) {
-                return;
+        if (status.pressedKey != null) {
+            self._show = true;
+            self._frame_counter = 0;
+       } else {
+            if (self.blink != 0) {
+                self._frame_counter = (self._frame_counter + 1) % self.blink;
+                if (self._frame_counter == 0) {
+                    self._show = !self._show;
+                }
+                if (!self._show) {
+                    return;
+                }
             }
         }
+        
         r.DrawRectangle(
             @intFromFloat(position.x),
             @intFromFloat(position.y),

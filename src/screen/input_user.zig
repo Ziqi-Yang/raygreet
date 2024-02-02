@@ -15,7 +15,7 @@ input_text_field: InputTextField = undefined,
 pub fn new(screen_size: Vector2, cursor_option: CursorOption) !InputUserScreen {
     const cursor: Cursor = .{
         .color = r.GRAY,
-        .blink = cursor_option.blink,
+        .blink = cursor_option._blink,
         .type = cursor_option.type
     };
     return .{

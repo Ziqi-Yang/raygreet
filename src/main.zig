@@ -1,4 +1,6 @@
 // FIXME: Vector2 to be @Vector(2, f16)
+// FIXME: handle shift and caption key in DRM mode
+// TODO Cursor blink color gradient
 const std = @import("std");
 const log = std.log;
 const builtin = @import("builtin");
@@ -8,6 +10,7 @@ const config = @import("config.zig");
 const screen = @import("screen.zig");
 const RayGreetScreen = screen.RayGreetScreen;
 const Vector2 = @import("util.zig").Vector2;
+const status = @import("status.zig");
 
 // override default log settings
 pub const std_options = struct {
@@ -64,16 +67,30 @@ pub fn main() !void {
         .y = @floatFromInt(SCREEN_HEIGHT)
     };
 
-    var input_user_screen = try screen.InputUserScreen.new(screen_size, CONFIG.cursor, CONFIG.fps, 0.1);
+    var input_user_screen = try screen.InputUserScreen.new(screen_size, CONFIG.cursor);
 
     const current_screen = RayGreetScreen{
         .input_user_screen = &input_user_screen,
     };
 
     while (!r.WindowShouldClose()) {
+        handleKey();
         r.BeginDrawing();
         try current_screen.draw();
         r.EndDrawing();
+    }
+}
+
+fn handleKey() void {
+    // Raylib Bug: IsKeyPressed(r.KEY_CAPS_LOCK) doesn't work properly, so
+    // handle keys using `r.GetKeyPressed`
+    const key = r.GetKeyPressed();
+    switch (key) {
+        r.KEY_CAPS_LOCK => {
+            status.capsLockOn = !status.capsLockOn;
+            log.info("status.capsLockOn: {}\n", .{status.capsLockOn});
+        },
+        else => {}
     }
 }
 

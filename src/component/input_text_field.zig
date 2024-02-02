@@ -1,8 +1,10 @@
 const std = @import("std");
+const log = std.log;
 const Cursor = @import("cursor.zig").Cursor;
-const util = @import("../util.zig");
 const Vector2 = @import("../util.zig").Vector2;
 const r = @cImport(@cInclude("raylib.h"));
+const config = @import("../config.zig");
+const status = @import("../status.zig");
 
 const InputTextField = @This();
 
@@ -18,7 +20,7 @@ offset: Vector2,
 color: r.Color,
 cursor: Cursor,
 cursor_offset: Vector2,
-
+_key_down_frame_counter: u8 = 0,
 
 /// box_size: the size of the box that the input text field is in
 /// this function must be called after raylib window initialization (to get
@@ -142,8 +144,68 @@ pub fn pop(self: *InputTextField) bool {
     return true;
 }
 
+// TODO current only support US keymap.
+// note that the left character is mapped from scan code to US keymap.
+// see: https://github.com/raysan5/raylib/discussions/3773
+fn upperCaseChar(char: u8) u8 {
+    return switch (char) {
+        'a'...'z' => char - 32,
+        '`' => '~',
+        '1' => '!',
+        '2' => '@',
+        '3' => '#',
+        '4' => '$',
+        '5' => '%',
+        '6' => '^',
+        '7' => '&',
+        '8' => '*',
+        '9' => '(',
+        '0' => ')',
+        '-' => '_',
+        '=' => '+',
+        '[' => '{',
+        ']' => '}',
+        '\\' => '|',
+        ';' => ':',
+        '\'' => '"',
+        ',' => '<',
+        '.' => '>',
+        '/' => '?',
+        else => char
+    };
+}
+
+fn handleInput(self: *InputTextField) void {
+    const CONFIG = config.get_config();
+    const char = r.GetCharPressed();
+    
+    switch (char) {
+        32...126 => {
+            var c: u8 = @intCast(char);
+
+            if (r.IsKeyDown(r.KEY_LEFT_SHIFT) or r.IsKeyDown(r.KEY_RIGHT_SHIFT)
+                    or (status.capsLockOn and c >= 'a' and c <= 'z')) {
+                c = upperCaseChar(c);
+            }
+
+            _ = self.push(c);
+        },
+        else => {}
+    }
+    if (r.IsKeyDown(r.KEY_BACKSPACE)) {
+        if (self._key_down_frame_counter == 0) {
+            _ = self.pop();
+        }
+        self._key_down_frame_counter = (self._key_down_frame_counter + 1) % CONFIG._frames_per_key_down;
+    } else {
+        self._key_down_frame_counter = 0;
+    }
+}
+
 /// outer_offset: position of the box that Input Text Filed is in
 pub fn draw(self: *InputTextField, outer_offset: Vector2) void {
+    self.handleInput();
+    
     const text = &self.text;
     // std.debug.print("{s}\n", .{text});
     const position = outer_offset.add(&self.offset);

@@ -31,10 +31,10 @@ pub fn new(box_size: Vector2, cursor: Cursor) !InputTextField {
         .font = r.GetFontDefault(),
         .font_size = undefined,
         .box_size = box_size,
-        .offset = Vector2 {.x = 0, .y = 0},
+        .offset = Vector2 { 0, 0},
         .color = r.DARKGRAY,
         .cursor = cursor,
-        .cursor_offset = Vector2 {.x = 0, .y = 0}
+        .cursor_offset = Vector2 {0, 0}
     };
     input_text_field.autoSetFontSize();
 
@@ -48,27 +48,27 @@ fn autoSetFontSize(self: *InputTextField) void {
     
     const text_size = measureInputTextFieldSize(text, &self.cursor, self.font, font_size);
     
-    const offset_x = (self.box_size.x - text_size.x) / 2;
-    const offset_y = (self.box_size.y - text_size.y) / 2;
-    self.offset.x = offset_x;
-    self.offset.y = offset_y;
+    const offset_x = (self.box_size[0] - text_size[0]) / 2;
+    const offset_y = (self.box_size[1] - text_size[1]) / 2;
+    self.offset[0] = offset_x;
+    self.offset[1] = offset_y;
     
     const cursor_size = self.cursor.setSize(font_size);
     // std.debug.print("{} # {} # {}\n", .{text_size, cursor_size, @as(f16, @floatFromInt(r.MeasureText(@ptrCast(self.text), font_size)))});
-    const cursor_offset_x = (offset_x + text_size.x - cursor_size.x);
-    const cursor_offset_y = (offset_y + text_size.y - cursor_size.y);
-    self.cursor_offset.x = cursor_offset_x;
-    self.cursor_offset.y = cursor_offset_y;
+    const cursor_offset_x = (offset_x + text_size[0] - cursor_size[0]);
+    const cursor_offset_y = (offset_y + text_size[1] - cursor_size[1]);
+    self.cursor_offset[0] = cursor_offset_x;
+    self.cursor_offset[1] = cursor_offset_y;
 }
 
 
 /// box_size: the size of the box that the input text field is in
 fn getPreferredFontSize(box_size: Vector2, font: r.Font, text: []const u8, cursor: *const Cursor) u16 {
-    const width_limit: f16 = box_size.x * 0.7;
+    const width_limit: f16 = box_size[0] * 0.7;
     // According to my observation(default font)
     // In Raylib, font size is equal to the font's actual display height
     const font_size = @min(
-        @as(u16, @intFromFloat(box_size.y / 2)),
+        @as(u16, @intFromFloat(box_size[1] / 2)),
         getMaxFontSizeWithWidthLimit(width_limit, font, text, cursor)
     );
 
@@ -84,7 +84,7 @@ fn getMaxFontSizeWithWidthLimit(width_limit: f16, font: r.Font, text: []const u8
     var res: u16 = left;
     while (left <= right) {
         fz = left + (right - left) / 2;
-        const text_width = measureInputTextFieldSize(text, cursor, font, fz).x;
+        const text_width = measureInputTextFieldSize(text, cursor, font, fz)[0];
         
         // std.debug.print(">{} {} {}\n", .{fz, text_width, width_limit});
         
@@ -103,7 +103,7 @@ fn measureInputTextFieldSize(text: []const u8, cursor: *const Cursor, font: r.Fo
     const font_size_f16: f16 = @floatFromInt(font_size);
     const spacing = font_size_f16 * SPACING_RATIO;
     const width = width: {
-        var width: f32 = cursor.calculateSize(font_size).x;
+        var width: f32 = cursor.calculateSize(font_size)[0];
         if (!std.mem.eql(u8, text, "")) {
             width +=
                 r.MeasureTextEx(
@@ -116,10 +116,7 @@ fn measureInputTextFieldSize(text: []const u8, cursor: *const Cursor, font: r.Fo
         break :width width;
     };
 
-    return .{
-        .x = @floatCast(width),
-        .y = font_size_f16
-    };
+    return .{ @floatCast(width), font_size_f16};
 }
 
 /// return whether push success (the reason to fail: size full)
@@ -208,12 +205,12 @@ pub fn draw(self: *InputTextField, outer_offset: Vector2) void {
     
     const text = &self.text;
     // std.debug.print("{s}\n", .{text});
-    const position = outer_offset.add(&self.offset);
+    const position = outer_offset + self.offset;
     const position_r = r.Vector2 {
-        .x = position.x,
-        .y = position.y
+        .x = position[0],
+        .y = position[1]
     };
-    const cursor_position = outer_offset.add(&self.cursor_offset);
+    const cursor_position = outer_offset + self.cursor_offset;
 
     // std.debug.print(">{}\n", .{cursor_position});
     

@@ -25,5 +25,5 @@ pub fn new(screen_size: Vector2, cursor_option: CursorOption) !InputUserScreen {
 
 pub fn draw(self: *InputUserScreen) !void {
     r.ClearBackground(r.RAYWHITE);
-    self.input_text_field.draw(Vector2 {.x = 0, .y = 0});
+    self.input_text_field.draw(Vector2 { 0, 0});
 }

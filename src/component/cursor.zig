@@ -6,7 +6,7 @@ pub const Cursor = struct {
     _show: bool = true,
     _frame_counter: u8 = 0,
     /// don't directly set size
-    size: Vector2 = .{.x = 1.0, .y = 1.0},
+    size: Vector2 = .{ 10.0, 10.0},
     color: r.Color,
     /// per num frame changes hide/show status (0 means no blink)
     blink: u8 = 0,
@@ -21,9 +21,9 @@ pub const Cursor = struct {
     pub fn calculateSize(self: *const Cursor, font_size: u16) Vector2 {
         const fz: f16 = @floatFromInt(font_size);
         return switch (self.type) {
-            .Box => .{.x = fz * 0.75, .y = @floatFromInt(font_size)},
-            .Bar => .{.x = fz * 0.1, .y = @floatFromInt(font_size)},
-            .Hbar => .{.x = @floatFromInt(font_size), .y = fz * 0.1 }
+            .Box => .{ fz * 0.75, @floatFromInt(font_size)},
+            .Bar => .{ fz * 0.1, @floatFromInt(font_size)},
+            .Hbar => .{ @floatFromInt(font_size), fz * 0.1 }
         };
     }
 
@@ -48,10 +48,10 @@ pub const Cursor = struct {
         }
         
         r.DrawRectangle(
-            @intFromFloat(position.x),
-            @intFromFloat(position.y),
-            @intFromFloat(self.size.x),
-            @intFromFloat(self.size.y),
+            @intFromFloat(position[0]),
+            @intFromFloat(position[1]),
+            @intFromFloat(self.size[0]),
+            @intFromFloat(self.size[1]),
             self.color
         );
     } 

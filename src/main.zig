@@ -1,6 +1,3 @@
-// FIXME: Vector2 to be @Vector(2, f16)
-// FIXME: handle shift and caption key in DRM mode
-// TODO Cursor blink color gradient
 const std = @import("std");
 const log = std.log;
 const builtin = @import("builtin");
@@ -63,8 +60,8 @@ pub fn main() !void {
     const SCREEN_HEIGHT = r.GetScreenHeight();
     
     const screen_size: Vector2 = .{
-        .x = @floatFromInt(SCREEN_WIDTH),
-        .y = @floatFromInt(SCREEN_HEIGHT)
+        @floatFromInt(SCREEN_WIDTH),
+        @floatFromInt(SCREEN_HEIGHT)
     };
 
     var input_user_screen = try screen.InputUserScreen.new(screen_size, CONFIG.cursor);

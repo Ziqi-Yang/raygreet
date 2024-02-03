@@ -20,13 +20,17 @@ offset: Vector2,
 color: r.Color,
 cursor: Cursor,
 cursor_offset: Vector2,
-_key_down_frame_counter: u8 = 0,
+
+func_pop_char: PopChar,
+func_pop_all: PopAll,
 
 /// box_size: the size of the box that the input text field is in
 /// this function must be called after raylib window initialization (to get
 /// default font)
 pub fn new(box_size: Vector2, cursor: Cursor) !InputTextField {
+    const CONFIG = config.get_config();
     if (!r.IsWindowReady()) return error.WindowNotInitialized;
+    
     var input_text_field = InputTextField {
         .font = r.GetFontDefault(),
         .font_size = undefined,
@@ -34,7 +38,11 @@ pub fn new(box_size: Vector2, cursor: Cursor) !InputTextField {
         .offset = Vector2 { 0, 0},
         .color = r.DARKGRAY,
         .cursor = cursor,
-        .cursor_offset = Vector2 {0, 0}
+        .cursor_offset = Vector2 {0, 0},
+        .func_pop_char = PopChar {
+            .frames_per_key_down = CONFIG._frames_per_key_down
+        },
+        .func_pop_all = PopAll {}
     };
     input_text_field.autoSetFontSize();
 
@@ -130,15 +138,15 @@ pub fn push(self: *InputTextField, char: u8) bool {
     return true;
 }
 
-/// return whether pop success (the reason to fail: size empty)
-pub fn pop(self: *InputTextField) bool {
+pub fn pop(self: *InputTextField) ?u8 {
     if (self._text_index == 0) {
-        return false;
+        return null;
     }
     self._text_index -= 1;
+    const old_char = self.text[self._text_index];
     self.text[self._text_index] = '\x00';
     self.autoSetFontSize();
-    return true;
+    return old_char;
 }
 
 // TODO current only support US keymap.
@@ -172,8 +180,59 @@ fn upperCaseChar(char: u8) u8 {
     };
 }
 
+const PopChar = struct {
+    frames_per_key_down: u8,
+    
+    var key_down_counter: u8 = 0;
+    
+    pub fn keydown(self: *const PopChar, inputTextField: *InputTextField, should_key_down: bool) void {
+        if (should_key_down) {
+            if (key_down_counter == 0) {
+                _ = inputTextField.pop();
+            }
+            key_down_counter = (key_down_counter + 1) % self.frames_per_key_down;
+        } else {
+            key_down_counter = 0;
+        }
+    }
+};
+
+const PopAll = struct {
+    pub fn keydown(_: *const PopAll, inputTextField: *InputTextField, should_key_down: bool) void {
+        if (!should_key_down) {
+            return;
+        }
+        var char: ?u8 = 0;
+        while (char != null) {
+            char = inputTextField.pop();
+        }
+    }
+};
+
+
+fn handleAllKeysDown(self: *InputTextField, keys: []const c_int, keydown_func: anytype) void {
+    var are_all_keys_down = true;
+    for (keys) |key| {
+        if (!r.IsKeyDown(key)) {
+            are_all_keys_down = false;
+            break;
+        }
+    }
+    keydown_func.keydown(self, are_all_keys_down);
+}
+
+fn handleOneKeyDown(self: *InputTextField, keys: []const c_int, keydown_func: anytype) void {
+    var has_one_key_down = false;
+    for (keys) |key| {
+        if (r.IsKeyDown(key)) {
+            has_one_key_down = true;
+            break;
+        }
+    }
+    keydown_func.keydown(self, has_one_key_down);
+}
+
 fn handleInput(self: *InputTextField) void {
-    const CONFIG = config.get_config();
     const char = r.GetCharPressed();
     
     switch (char) {
@@ -189,13 +248,12 @@ fn handleInput(self: *InputTextField) void {
         },
         else => {}
     }
-    if (r.IsKeyDown(r.KEY_BACKSPACE)) {
-        if (self._key_down_frame_counter == 0) {
-            _ = self.pop();
-        }
-        self._key_down_frame_counter = (self._key_down_frame_counter + 1) % CONFIG._frames_per_key_down;
+
+    if ((r.IsKeyDown(r.KEY_LEFT_CONTROL) or r.IsKeyDown(r.KEY_RIGHT_CONTROL))) {
+        // batch delete
+        self.handleOneKeyDown(&.{r.KEY_W, r.KEY_BACKSPACE}, self.func_pop_all);
     } else {
-        self._key_down_frame_counter = 0;
+        self.handleAllKeysDown(&.{r.KEY_BACKSPACE}, self.func_pop_char);
     }
 }
 

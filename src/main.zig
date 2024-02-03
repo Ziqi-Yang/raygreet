@@ -64,16 +64,17 @@ pub fn main() !void {
         @floatFromInt(SCREEN_HEIGHT)
     };
 
-    var input_user_screen = try screen.InputUserScreen.new(screen_size, CONFIG.cursor);
+    screen.input_user_screen = try screen.InputUserScreen.new(screen_size, CONFIG.cursor);
+    // screen.input_user_screen = try screen.InputPasswordScreen.new(screen_size, CONFIG.cursor);
 
-    const current_screen = RayGreetScreen{
-        .input_user_screen = &input_user_screen,
+    status.current_screen = RayGreetScreen {
+        .input_user_screen = &screen.input_user_screen,
     };
 
     while (!r.WindowShouldClose()) {
         handleKey();
         r.BeginDrawing();
-        try current_screen.draw();
+        try status.current_screen.draw();
         r.EndDrawing();
     }
 }

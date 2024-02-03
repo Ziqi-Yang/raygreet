@@ -72,12 +72,11 @@ fn autoSetFontSize(self: *InputTextField) void {
 
 /// box_size: the size of the box that the input text field is in
 fn getPreferredFontSize(box_size: Vector2, font: r.Font, text: []const u8, cursor: *const Cursor) u16 {
-    const width_limit: f16 = box_size[0] * 0.7;
-    // According to my observation(default font)
+    // According to my observation
     // In Raylib, font size is equal to the font's actual display height
     const font_size = @min(
-        @as(u16, @intFromFloat(box_size[1] / 2)),
-        getMaxFontSizeWithWidthLimit(width_limit, font, text, cursor)
+        @as(u16, @intFromFloat(box_size[1])),
+        getMaxFontSizeWithWidthLimit(box_size[0], font, text, cursor)
     );
 
     return font_size;
@@ -233,6 +232,10 @@ fn handleOneKeyDown(self: *InputTextField, keys: []const c_int, keydown_func: an
 }
 
 fn handleInput(self: *InputTextField) void {
+    if (r.IsKeyDown(r.KEY_ENTER) or r.IsKeyDown(r.KEY_KP_ENTER)) {
+        // status.current_screen = 
+    }
+    
     const char = r.GetCharPressed();
     
     switch (char) {

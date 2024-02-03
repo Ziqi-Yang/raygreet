@@ -2,6 +2,9 @@ const std = @import("std");
 pub const InputUserScreen = @import("screen/input_user.zig");
 pub const InputPasswordScreen = @import("screen/input_password.zig");
 
+pub var input_user_screen: InputUserScreen = undefined;
+pub var input_password_screen: InputPasswordScreen = undefined;
+
 pub const RayGreetScreen = union(enum) {
     input_user_screen: *InputUserScreen,
     input_password_screen: *InputPasswordScreen,

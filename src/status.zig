@@ -2,4 +2,4 @@
 pub var capsLockOn = false;
 
 /// currently pressed key (r.GetKeyPressed is a self-consumed function)
-pub var pressedKey: ?u32 = null;
+pub var pressedKey: ?u16 = null;

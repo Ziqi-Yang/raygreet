@@ -1,3 +1,4 @@
+// TODO, disable esc key (at the very end)
 const std = @import("std");
 const log = std.log;
 const builtin = @import("builtin");
@@ -26,19 +27,19 @@ const setup_cmd: CommandT = .{
 };
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK");
-    var arena = std.heap.ArenaAllocator.init(gpa.allocator());
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa_impl = std.heap.GeneralPurposeAllocator(.{}){};
+    defer if (gpa_impl.deinit() == .leak) @panic("MEMORY LEAK");
+    var arena_impl = std.heap.ArenaAllocator.init(gpa_impl.allocator());
+    defer arena_impl.deinit();
+    const arena = arena_impl.allocator();
     
     const stdout = std.io.getStdOut().writer();
 
     // parse arguments
-    const main_cmd = try setup_cmd.init(allocator, .{});
+    const main_cmd = try setup_cmd.init(arena, .{});
     defer main_cmd.deinit();
 
-    var args_iter = try cova.ArgIteratorGeneric.init(allocator);
+    var args_iter = try cova.ArgIteratorGeneric.init(arena);
     defer args_iter.deinit();
     cova.parseArgs(&args_iter, CommandT, &main_cmd, stdout, .{}) catch |err| switch (err) {
         error.UsageHelpCalled => {},
@@ -48,7 +49,7 @@ pub fn main() !void {
     // if (builtin.mode == .Debug) try cova.utils.displayCmdInfo(CommandT, &main_cmd, allocator, &stdout);
 
     log.info("Reading configuration at {s}", .{config.CONFIG_FILE_PATH});
-    const CONFIG = try config.parse_config(allocator);
+    const CONFIG = try config.parse_config(arena);
 
     // initialize screen
     
@@ -65,7 +66,7 @@ pub fn main() !void {
     };
 
     screen.input_user_screen = try screen.InputUserScreen.new(screen_size, CONFIG.cursor);
-    // screen.input_user_screen = try screen.InputPasswordScreen.new(screen_size, CONFIG.cursor);
+    screen.input_password_screen = try screen.InputPasswordScreen.new(screen_size, CONFIG.cursor);
 
     status.current_screen = RayGreetScreen {
         .input_user_screen = &screen.input_user_screen,

@@ -5,6 +5,7 @@ const Vector2 = @import("../util.zig").Vector2;
 const r = @cImport(@cInclude("raylib.h"));
 const config = @import("../config.zig");
 const status = @import("../status.zig");
+const KeyPress = @import("../trait/keypress.zig").KeyPress;
 
 const InputTextField = @This();
 
@@ -21,13 +22,14 @@ color: r.Color,
 cursor: Cursor,
 cursor_offset: Vector2,
 
+func_enter_key_down: KeyPress,
 func_pop_char: PopChar,
 func_pop_all: PopAll,
 
 /// box_size: the size of the box that the input text field is in
 /// this function must be called after raylib window initialization (to get
 /// default font)
-pub fn new(box_size: Vector2, cursor: Cursor) !InputTextField {
+pub fn new(box_size: Vector2, cursor: Cursor, func_enter_key_down: KeyPress) !InputTextField {
     const CONFIG = config.get_config();
     if (!r.IsWindowReady()) return error.WindowNotInitialized;
     
@@ -35,10 +37,11 @@ pub fn new(box_size: Vector2, cursor: Cursor) !InputTextField {
         .font = r.GetFontDefault(),
         .font_size = undefined,
         .box_size = box_size,
-        .offset = Vector2 { 0, 0},
+        .offset = Vector2 {0, 0},
         .color = r.DARKGRAY,
         .cursor = cursor,
         .cursor_offset = Vector2 {0, 0},
+        .func_enter_key_down = func_enter_key_down,
         .func_pop_char = PopChar {
             .frames_per_key_down = CONFIG._frames_per_key_down
         },
@@ -232,8 +235,9 @@ fn handleOneKeyDown(self: *InputTextField, keys: []const c_int, keydown_func: an
 }
 
 fn handleInput(self: *InputTextField) void {
-    if (r.IsKeyDown(r.KEY_ENTER) or r.IsKeyDown(r.KEY_KP_ENTER)) {
-        // status.current_screen = 
+    if (r.IsKeyPressed(r.KEY_ENTER) or r.IsKeyPressed(r.KEY_KP_ENTER)) {
+        self.func_enter_key_down.press_key();
+        return;
     }
     
     const char = r.GetCharPressed();

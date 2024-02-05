@@ -4,15 +4,13 @@ const InputTextField = @import("../component/input_text_field.zig");
 const Vector2 = @import("../util.zig").Vector2;
 const Cursor = @import("../component/cursor.zig").Cursor;
 const CursorOption = @import("../config.zig").CursorOption;
-const ArenaAllocator = std.heap.ArenaAllocator;
-const Allocator = std.mem.Allocator;
+const screen = @import("../screen.zig");
 
 const InputUserScreen = @This();
 
 screen_size: Vector2,
 input_text_field: InputTextField,
 
-// keydown_speed: time per key down event
 pub fn new(screen_size: Vector2, cursor_option: CursorOption) !InputUserScreen {
     const cursor: Cursor = .{
         .color = r.GRAY,
@@ -23,7 +21,10 @@ pub fn new(screen_size: Vector2, cursor_option: CursorOption) !InputUserScreen {
     return .{
         .screen_size = screen_size,
         .input_text_field = try InputTextField.new(
-            box_size, cursor)
+            box_size, cursor, .{
+                .input_user_screen_enter_key_function = screen.InputUserScreenEnterKeyFunction {}
+            }
+        )
     };
 }
 

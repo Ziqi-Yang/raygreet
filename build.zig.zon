@@ -7,6 +7,10 @@
             .url = "https://github.com/00JCIV00/cova/archive/19dcf0655af8dff4d55a9012a557984ffbe9f674.tar.gz",
             .hash = "1220a8b06d4d91ff6e260794fc2a8f729f8c8713c3006611926f3e5dad915e97b36d",
         },
+        .greetd_ipc = .{
+            .url = "https://git.sr.ht/~meow_king/greetd_ipc/archive/v0.1.0.tar.gz",
+            .hash = "12206a0e69578cd846343488c60ad0dbdd85d6a710da4f8669d74d25daf24d28b50d",
+        },
     },
 
     .paths = .{

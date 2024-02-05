@@ -5,73 +5,227 @@ const Vector2 = @import("../util.zig").Vector2;
 const r = @cImport(@cInclude("raylib.h"));
 const config = @import("../config.zig");
 const status = @import("../status.zig");
-const KeyPress = @import("../trait/keypress.zig").KeyPress;
-
-const InputTextField = @This();
+const util = @import("../util.zig");
+// const KeyPress = @import("../trait/keypress.zig").KeyPress;
 
 const MAX_TEXT_LEN = 255;
 const SPACING_RATIO: f16 = 0.1; // spacing = text_size * spacing_ratio
 
-text: [MAX_TEXT_LEN: '\x00']u8 = [_: '\x00']u8{'\x00'} ** MAX_TEXT_LEN,
-_text_index: u8 = 0,
-font: r.Font,
-font_size: u16,
-box_size: Vector2,
-offset: Vector2,
-color: r.Color,
-cursor: Cursor,
-cursor_offset: Vector2,
-
-func_enter_key_down: KeyPress,
-func_pop_char: PopChar,
-func_pop_all: PopAll,
-
 /// box_size: the size of the box that the input text field is in
 /// this function must be called after raylib window initialization (to get
 /// default font)
-pub fn new(box_size: Vector2, cursor: Cursor, func_enter_key_down: KeyPress) !InputTextField {
-    const CONFIG = config.get_config();
-    if (!r.IsWindowReady()) return error.WindowNotInitialized;
-    
-    var input_text_field = InputTextField {
-        .font = r.GetFontDefault(),
-        .font_size = undefined,
-        .box_size = box_size,
-        .offset = Vector2 {0, 0},
-        .color = r.DARKGRAY,
-        .cursor = cursor,
-        .cursor_offset = Vector2 {0, 0},
-        .func_enter_key_down = func_enter_key_down,
-        .func_pop_char = PopChar {
-            .frames_per_key_down = CONFIG._frames_per_key_down
-        },
-        .func_pop_all = PopAll {}
+// pub fn newInputTextField(
+//     comptime SCREEN_TYPE: type,
+//     screen: SCREEN_TYPE,
+//     box_size: Vector2,
+//     func_enter_key_down: *const fn (*SCREEN_TYPE) void
+// ) !InputTextField(SCREEN_TYPE) {
+//     return InputTextField(SCREEN_TYPE).new(box_size, func_enter_key_down);
+// }
+
+pub const InputTextField = struct {
+    const Self = @This();
+
+    const PopChar = struct {
+        var key_down_counter: u8 = 0;
+        
+        pub fn keydown(_: @This(), input_text_field: *Self, should_key_down: bool) void {
+            if (should_key_down) {
+                if (key_down_counter == 0) {
+                    _ = input_text_field.pop();
+                }
+                key_down_counter = (key_down_counter + 1) % input_text_field.frames_per_key_down;
+            } else {
+                key_down_counter = 0;
+            }
+        }
     };
-    input_text_field.autoSetFontSize();
 
-    return input_text_field;
-}
+    const PopAll = struct {
+        pub fn keydown(_: @This(), input_text_field: *Self, should_key_down: bool) void {
+            if (!should_key_down) {
+                return;
+            }
+            var char: ?u8 = 0;
+            // TODO refactor
+            while (char != null) {
+                char = input_text_field.pop();
+            }
+        }
+    };
 
-fn autoSetFontSize(self: *InputTextField) void {
-    const text = &self.text;
-    const font_size = getPreferredFontSize(self.box_size, self.font, text, &self.cursor);
-    self.font_size = font_size;
-    
-    const text_size = measureInputTextFieldSize(text, &self.cursor, self.font, font_size);
-    
-    const offset_x = (self.box_size[0] - text_size[0]) / 2;
-    const offset_y = (self.box_size[1] - text_size[1]) / 2;
-    self.offset[0] = offset_x;
-    self.offset[1] = offset_y;
-    
-    const cursor_size = self.cursor.setSize(font_size);
-    // std.debug.print("{} # {} # {}\n", .{text_size, cursor_size, @as(f16, @floatFromInt(r.MeasureText(@ptrCast(self.text), font_size)))});
-    const cursor_offset_x = (offset_x + text_size[0] - cursor_size[0]);
-    const cursor_offset_y = (offset_y + text_size[1] - cursor_size[1]);
-    self.cursor_offset[0] = cursor_offset_x;
-    self.cursor_offset[1] = cursor_offset_y;
-}
+    const POP_ALL = PopAll {};
+    const KEY_BACKSPACE_POP_CHAR = PopChar {};
 
+    // TODO
+    text: [MAX_TEXT_LEN: '\x00']u8 = [_: '\x00']u8{'\x00'} ** MAX_TEXT_LEN,
+    _text_index: u8 = 0,
+    font: r.Font,
+    font_size: u16 = undefined,
+    box_size: Vector2,
+    offset: Vector2 = Vector2 {0, 0},
+    color: r.Color = r.DARKGRAY,
+    cursor: Cursor,
+    cursor_offset: Vector2 = Vector2 {0, 0},
+    frames_per_key_down: u8,
+    func_enter_key_down: ?*const fn () void,
+
+    pub fn new(
+        box_size: Vector2,
+        func_enter_key_down: ?*const fn () void
+    ) !Self {
+        if (!r.IsWindowReady()) return error.WindowNotInitialized;
+        const CONFIG = config.get_config();
+
+        const font = r.GetFontDefault();
+        const cursor: Cursor = .{
+            .color = r.GRAY,
+            .blink = CONFIG.cursor._blink,
+            .type = CONFIG.cursor.type
+        };
+
+        var res: Self = .{
+            .font = font,
+            // font_size
+            .box_size = box_size,
+            .cursor = cursor,
+            .frames_per_key_down = CONFIG._frames_per_key_down,
+            .func_enter_key_down = func_enter_key_down
+        };
+        res.update();
+        std.debug.print("{any}\n", .{res});
+        return res;
+    }
+
+    /// update font_size, offset, cursor.size and cursor_offset field
+    pub fn update(self: *Self) void {
+        // TODO
+        const text = &self.text;
+        const font_size = getPreferredFontSize(self.box_size, self.font, text, &self.cursor);
+        self.font_size = font_size;
+        
+        const text_size = measureInputTextFieldSize(text, &self.cursor, self.font, font_size);
+        
+        const offset_x = (self.box_size[0] - text_size[0]) / 2;
+        const offset_y = (self.box_size[1] - text_size[1]) / 2;
+        self.offset[0] = offset_x;
+        self.offset[1] = offset_y;
+        
+        const cursor_size = self.cursor.setSize(font_size);
+        // std.debug.print("{} # {} # {}\n", .{text_size, cursor_size, @as(f16, @floatFromInt(r.MeasureText(@ptrCast(self.text), font_size)))});
+        const cursor_offset_x = (offset_x + text_size[0] - cursor_size[0]);
+        const cursor_offset_y = (offset_y + text_size[1] - cursor_size[1]);
+        self.cursor_offset[0] = cursor_offset_x;
+        self.cursor_offset[1] = cursor_offset_y;
+
+        
+    }
+
+    /// return whether push success (the reason to fail: size full)
+    pub fn push(self: *Self, char: u8) bool {
+        if (self._text_index >= self.text.len) {
+            return false;
+        } 
+        self.text[self._text_index] = char;
+        self._text_index += 1;
+        self.update();
+        return true;
+    }
+
+    pub fn pop(self: *Self) ?u8 {
+        if (self._text_index == 0) {
+            return null;
+        }
+        self._text_index -= 1;
+        const old_char = self.text[self._text_index];
+        self.text[self._text_index] = '\x00';
+        self.update();
+        return old_char;
+    }
+
+
+    fn handleAllKeysDown(self: *Self, keys: []const c_int, keydown_func: anytype) void {
+        var are_all_keys_down = true;
+        for (keys) |key| {
+            if (!r.IsKeyDown(key)) {
+                are_all_keys_down = false;
+                break;
+            }
+        }
+        keydown_func.keydown(self, are_all_keys_down);
+    }
+
+    fn handleOneKeyDown(self: *Self, keys: []const c_int, keydown_func: anytype) void {
+        var has_one_key_down = false;
+        for (keys) |key| {
+            if (r.IsKeyDown(key)) {
+                has_one_key_down = true;
+                break;
+            }
+        }
+        keydown_func.keydown(self, has_one_key_down);
+    }
+
+    fn handleInput(self: *Self) void {
+        if (r.IsKeyPressed(r.KEY_ENTER) or r.IsKeyPressed(r.KEY_KP_ENTER)) {
+            if (self.func_enter_key_down) | func | {
+                func();
+                return;
+            }
+        }
+
+        // TODO record current pressed key and char in status, since it is one time operation
+        const char = r.GetCharPressed();
+        
+        switch (char) {
+            32...126 => {
+                var c: u8 = @intCast(char);
+
+                if (r.IsKeyDown(r.KEY_LEFT_SHIFT) or r.IsKeyDown(r.KEY_RIGHT_SHIFT)
+                        or (status.capsLockOn and c >= 'a' and c <= 'z')) {
+                    c = util.upperCaseChar(c);
+                }
+
+                _ = self.push(c);
+            },
+            else => {}
+        }
+
+        if ((r.IsKeyDown(r.KEY_LEFT_CONTROL) or r.IsKeyDown(r.KEY_RIGHT_CONTROL))) {
+            // batch delete
+            self.handleOneKeyDown(&.{r.KEY_W, r.KEY_BACKSPACE}, POP_ALL);
+        } else {
+            self.handleAllKeysDown(&.{r.KEY_BACKSPACE}, KEY_BACKSPACE_POP_CHAR);
+        }
+    }
+
+    /// outer_offset: position of the box that Input Text Filed is in
+    pub fn draw(self: *Self, outer_offset: Vector2) void {
+        self.handleInput();
+        
+        const text = &self.text;
+        // std.debug.print("{s}\n", .{text});
+        const position = outer_offset + self.offset;
+        const position_r = r.Vector2 {
+            .x = position[0],
+            .y = position[1]
+        };
+        const cursor_position = outer_offset + self.cursor_offset;
+
+        // std.debug.print(">{}\n", .{cursor_position});
+        
+        r.DrawTextEx(
+            self.font,
+            @ptrCast(text),
+            position_r,
+            @floatFromInt(self.font_size),
+            @as(f16, @floatFromInt(self.font_size)) * SPACING_RATIO,
+            self.color
+        );
+
+        self.cursor.draw(&cursor_position);
+    }
+};
 
 /// box_size: the size of the box that the input text field is in
 fn getPreferredFontSize(box_size: Vector2, font: r.Font, text: []const u8, cursor: *const Cursor) u16 {
@@ -127,166 +281,4 @@ fn measureInputTextFieldSize(text: []const u8, cursor: *const Cursor, font: r.Fo
     };
 
     return .{ @floatCast(width), font_size_f16};
-}
-
-/// return whether push success (the reason to fail: size full)
-pub fn push(self: *InputTextField, char: u8) bool {
-    if (self._text_index >= self.text.len) {
-        return false;
-    } 
-    self.text[self._text_index] = char;
-    self._text_index += 1;
-    self.autoSetFontSize();
-    return true;
-}
-
-pub fn pop(self: *InputTextField) ?u8 {
-    if (self._text_index == 0) {
-        return null;
-    }
-    self._text_index -= 1;
-    const old_char = self.text[self._text_index];
-    self.text[self._text_index] = '\x00';
-    self.autoSetFontSize();
-    return old_char;
-}
-
-// TODO current only support US keymap.
-// note that the left character is mapped from scan code to US keymap.
-// see: https://github.com/raysan5/raylib/discussions/3773
-fn upperCaseChar(char: u8) u8 {
-    return switch (char) {
-        'a'...'z' => char - 32,
-        '`' => '~',
-        '1' => '!',
-        '2' => '@',
-        '3' => '#',
-        '4' => '$',
-        '5' => '%',
-        '6' => '^',
-        '7' => '&',
-        '8' => '*',
-        '9' => '(',
-        '0' => ')',
-        '-' => '_',
-        '=' => '+',
-        '[' => '{',
-        ']' => '}',
-        '\\' => '|',
-        ';' => ':',
-        '\'' => '"',
-        ',' => '<',
-        '.' => '>',
-        '/' => '?',
-        else => char
-    };
-}
-
-const PopChar = struct {
-    frames_per_key_down: u8,
-    
-    var key_down_counter: u8 = 0;
-    
-    pub fn keydown(self: *const PopChar, inputTextField: *InputTextField, should_key_down: bool) void {
-        if (should_key_down) {
-            if (key_down_counter == 0) {
-                _ = inputTextField.pop();
-            }
-            key_down_counter = (key_down_counter + 1) % self.frames_per_key_down;
-        } else {
-            key_down_counter = 0;
-        }
-    }
-};
-
-const PopAll = struct {
-    pub fn keydown(_: *const PopAll, inputTextField: *InputTextField, should_key_down: bool) void {
-        if (!should_key_down) {
-            return;
-        }
-        var char: ?u8 = 0;
-        while (char != null) {
-            char = inputTextField.pop();
-        }
-    }
-};
-
-
-fn handleAllKeysDown(self: *InputTextField, keys: []const c_int, keydown_func: anytype) void {
-    var are_all_keys_down = true;
-    for (keys) |key| {
-        if (!r.IsKeyDown(key)) {
-            are_all_keys_down = false;
-            break;
-        }
-    }
-    keydown_func.keydown(self, are_all_keys_down);
-}
-
-fn handleOneKeyDown(self: *InputTextField, keys: []const c_int, keydown_func: anytype) void {
-    var has_one_key_down = false;
-    for (keys) |key| {
-        if (r.IsKeyDown(key)) {
-            has_one_key_down = true;
-            break;
-        }
-    }
-    keydown_func.keydown(self, has_one_key_down);
-}
-
-fn handleInput(self: *InputTextField) void {
-    if (r.IsKeyPressed(r.KEY_ENTER) or r.IsKeyPressed(r.KEY_KP_ENTER)) {
-        self.func_enter_key_down.press_key();
-        return;
-    }
-    
-    const char = r.GetCharPressed();
-    
-    switch (char) {
-        32...126 => {
-            var c: u8 = @intCast(char);
-
-            if (r.IsKeyDown(r.KEY_LEFT_SHIFT) or r.IsKeyDown(r.KEY_RIGHT_SHIFT)
-                    or (status.capsLockOn and c >= 'a' and c <= 'z')) {
-                c = upperCaseChar(c);
-            }
-
-            _ = self.push(c);
-        },
-        else => {}
-    }
-
-    if ((r.IsKeyDown(r.KEY_LEFT_CONTROL) or r.IsKeyDown(r.KEY_RIGHT_CONTROL))) {
-        // batch delete
-        self.handleOneKeyDown(&.{r.KEY_W, r.KEY_BACKSPACE}, self.func_pop_all);
-    } else {
-        self.handleAllKeysDown(&.{r.KEY_BACKSPACE}, self.func_pop_char);
-    }
-}
-
-/// outer_offset: position of the box that Input Text Filed is in
-pub fn draw(self: *InputTextField, outer_offset: Vector2) void {
-    self.handleInput();
-    
-    const text = &self.text;
-    // std.debug.print("{s}\n", .{text});
-    const position = outer_offset + self.offset;
-    const position_r = r.Vector2 {
-        .x = position[0],
-        .y = position[1]
-    };
-    const cursor_position = outer_offset + self.cursor_offset;
-
-    // std.debug.print(">{}\n", .{cursor_position});
-    
-    r.DrawTextEx(
-        self.font,
-        @ptrCast(text),
-        position_r,
-        @floatFromInt(self.font_size),
-        @as(f16, @floatFromInt(self.font_size)) * SPACING_RATIO,
-        self.color
-    );
-
-    self.cursor.draw(&cursor_position);
 }

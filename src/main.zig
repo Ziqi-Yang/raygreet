@@ -10,6 +10,9 @@ const RayGreetScreen = screen.RayGreetScreen;
 const Vector2 = @import("util.zig").Vector2;
 const status = @import("status.zig");
 
+const greetd_ipc = @import("greetd_ipc"); // TODO
+const GreetdIPC = greetd_ipc.GreetdIPC;
+
 // override default log settings
 pub const std_options = struct {
     pub const log_level = .debug;
@@ -47,7 +50,6 @@ pub fn main() !void {
     };
     
     // if (builtin.mode == .Debug) try cova.utils.displayCmdInfo(CommandT, &main_cmd, allocator, &stdout);
-
     log.info("Reading configuration at {s}", .{config.CONFIG_FILE_PATH});
     const CONFIG = try config.parse_config(arena);
 
@@ -57,16 +59,9 @@ pub fn main() !void {
     r.InitWindow(0, 0, @ptrCast(CONFIG.window_name));
     defer r.CloseWindow();
     r.SetTargetFPS(CONFIG.fps);
-    const SCREEN_WIDTH = r.GetScreenWidth();
-    const SCREEN_HEIGHT = r.GetScreenHeight();
     
-    const screen_size: Vector2 = .{
-        @floatFromInt(SCREEN_WIDTH),
-        @floatFromInt(SCREEN_HEIGHT)
-    };
-
-    screen.input_user_screen = try screen.InputUserScreen.new(screen_size, CONFIG.cursor);
-    screen.input_password_screen = try screen.InputPasswordScreen.new(screen_size, CONFIG.cursor);
+    screen.input_user_screen = try screen.InputUserScreen.new();
+    screen.input_user_screen.init();
 
     status.current_screen = RayGreetScreen {
         .input_user_screen = &screen.input_user_screen,

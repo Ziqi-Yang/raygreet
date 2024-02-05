@@ -28,6 +28,7 @@ fn addDependencies(
     comp.linkLibrary(raylib);
 
     try addDependencyModules(comp, b, "cova", &.{"cova"}, target, optimize);
+    try addDependencyModules(comp, b, "greetd_ipc", &.{"greetd_ipc"}, target, optimize);
 }
 
 pub fn build(b: *std.Build) !void {

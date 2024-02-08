@@ -5,7 +5,7 @@ const Cursor = @import("../component/cursor.zig").Cursor;
 const CursorOption = @import("../config.zig").CursorOption;
 const InputTextField = @import("../component/input_text_field.zig").InputTextField;
 
-pub const InputUserScreen = struct {
+pub const MainScreen = struct {
     const Self = @This();
     
     screen_size: Vector2,

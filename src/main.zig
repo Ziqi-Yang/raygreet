@@ -60,11 +60,11 @@ pub fn main() !void {
     defer r.CloseWindow();
     r.SetTargetFPS(CONFIG.fps);
     
-    screen.input_user_screen = try screen.InputUserScreen.new();
-    screen.input_user_screen.init();
+    screen.main_screen = try screen.MainScreen.new();
+    screen.main_screen.init();
 
     status.current_screen = RayGreetScreen {
-        .input_user_screen = &screen.input_user_screen,
+        .main_screen = &screen.main_screen,
     };
 
     while (!r.WindowShouldClose()) {
@@ -76,25 +76,46 @@ pub fn main() !void {
 }
 
 fn handleKey() void {
-    const key = r.GetKeyPressed();
-    // note: most condition pass, however, when you press 'a' and then 'alt', then
-    // release 'alt' key, you still see the blink cursor.
-    status.pressedKey = if (key != 0)  @intCast(key) else key: {
-        if (status.pressedKey == null
-                or (r.IsKeyUp(@intCast(status.pressedKey.?)))) {
-            break :key null;
-        } else {
-            break :key status.pressedKey;
+    // set `status.cur_pressed_keys`
+    {
+        var i: u8 = 0;
+        while (i < status.MAX_KEY_PRESSED) {
+            const key = r.GetKeyPressed();
+            if (key == 0) {
+                status.cur_pressed_keys[i] = null;
+                break;
+            }
+            status.cur_pressed_keys[i] = @intCast(key);
+            i += 1;
         }
-    };
-    switch (key) {
-        // Raylib Bug: IsKeyPressed(r.KEY_CAPS_LOCK) doesn't work properly, so
-        // handle keys using `r.GetKeyPressed`
-        r.KEY_CAPS_LOCK => {
-            status.capsLockOn = !status.capsLockOn;
-            log.info("status.capsLockOn: {}\n", .{status.capsLockOn});
-        },
-        else => {}
+    }
+
+    // set `status.cur_pressed_chars`
+    {
+        var i: u8 = 0;
+        while (i < status.MAX_KEY_PRESSED) {
+            const key = r.GetCharPressed();
+            if (key == 0) {
+                status.cur_pressed_chars[i] = null;
+                break;
+            }
+            status.cur_pressed_chars[i] = @intCast(key);
+            i += 1;
+        }
+    }
+
+    // handle pressed keys (global level)
+    for (status.cur_pressed_keys) | key | {
+        if (key == null) break;
+        switch (key.?) {
+            // Raylib Bug: IsKeyPressed(r.KEY_CAPS_LOCK) doesn't work properly, so
+            // handle keys using `r.GetKeyPressed`
+            r.KEY_CAPS_LOCK => {
+                status.caps_lock_on = !status.caps_lock_on;
+                log.info("status.caps_lock_on: {}\n", .{status.caps_lock_on});
+            },
+            else => {}
+        }
     }
 }
 

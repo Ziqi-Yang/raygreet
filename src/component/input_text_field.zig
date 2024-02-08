@@ -6,22 +6,9 @@ const r = @cImport(@cInclude("raylib.h"));
 const config = @import("../config.zig");
 const status = @import("../status.zig");
 const util = @import("../util.zig");
-// const KeyPress = @import("../trait/keypress.zig").KeyPress;
 
 const MAX_TEXT_LEN = 255;
 const SPACING_RATIO: f16 = 0.1; // spacing = text_size * spacing_ratio
-
-/// box_size: the size of the box that the input text field is in
-/// this function must be called after raylib window initialization (to get
-/// default font)
-// pub fn newInputTextField(
-//     comptime SCREEN_TYPE: type,
-//     screen: SCREEN_TYPE,
-//     box_size: Vector2,
-//     func_enter_key_down: *const fn (*SCREEN_TYPE) void
-// ) !InputTextField(SCREEN_TYPE) {
-//     return InputTextField(SCREEN_TYPE).new(box_size, func_enter_key_down);
-// }
 
 pub const InputTextField = struct {
     const Self = @This();
@@ -46,18 +33,13 @@ pub const InputTextField = struct {
             if (!should_key_down) {
                 return;
             }
-            var char: ?u8 = 0;
-            // TODO refactor
-            while (char != null) {
-                char = input_text_field.pop();
-            }
+            input_text_field.reset();
         }
     };
 
     const POP_ALL = PopAll {};
     const KEY_BACKSPACE_POP_CHAR = PopChar {};
 
-    // TODO
     text: [MAX_TEXT_LEN: '\x00']u8 = [_: '\x00']u8{'\x00'} ** MAX_TEXT_LEN,
     _text_index: u8 = 0,
     font: r.Font,
@@ -69,7 +51,10 @@ pub const InputTextField = struct {
     cursor_offset: Vector2 = Vector2 {0, 0},
     frames_per_key_down: u8,
     func_enter_key_down: ?*const fn () void,
-
+    
+    /// box_size: the size of the box that the input text field is in
+    /// this function must be called after raylib window initialization (to get
+    /// default font)
     pub fn new(
         box_size: Vector2,
         func_enter_key_down: ?*const fn () void
@@ -93,7 +78,6 @@ pub const InputTextField = struct {
             .func_enter_key_down = func_enter_key_down
         };
         res.update();
-        std.debug.print("{any}\n", .{res});
         return res;
     }
 
@@ -101,10 +85,10 @@ pub const InputTextField = struct {
     pub fn update(self: *Self) void {
         // TODO
         const text = &self.text;
-        const font_size = getPreferredFontSize(self.box_size, self.font, text, &self.cursor);
+        const font_size = getPreferredFontSize(self.box_size, self.font, text, self.cursor);
         self.font_size = font_size;
         
-        const text_size = measureInputTextFieldSize(text, &self.cursor, self.font, font_size);
+        const text_size = measureInputTextFieldSize(text, self.cursor, self.font, font_size);
         
         const offset_x = (self.box_size[0] - text_size[0]) / 2;
         const offset_y = (self.box_size[1] - text_size[1]) / 2;
@@ -121,7 +105,8 @@ pub const InputTextField = struct {
         
     }
 
-    /// return whether push success (the reason to fail: size full)
+    /// return whether push success (the reason to fail: size full) and update
+    /// the input text field
     pub fn push(self: *Self, char: u8) bool {
         if (self._text_index >= self.text.len) {
             return false;
@@ -129,9 +114,11 @@ pub const InputTextField = struct {
         self.text[self._text_index] = char;
         self._text_index += 1;
         self.update();
+        self.cursor.resetBlink();
         return true;
     }
 
+    /// Return the old character and update the input text field.
     pub fn pop(self: *Self) ?u8 {
         if (self._text_index == 0) {
             return null;
@@ -140,9 +127,16 @@ pub const InputTextField = struct {
         const old_char = self.text[self._text_index];
         self.text[self._text_index] = '\x00';
         self.update();
+        self.cursor.resetBlink();
         return old_char;
     }
 
+    pub fn reset(self: *Self) void {
+        while (self._text_index > 0) : (self._text_index -= 1) {
+            self.text[self._text_index - 1] = '\x00';
+        }
+        self.update();
+    }
 
     fn handleAllKeysDown(self: *Self, keys: []const c_int, keydown_func: anytype) void {
         var are_all_keys_down = true;
@@ -174,23 +168,22 @@ pub const InputTextField = struct {
             }
         }
 
-        // TODO record current pressed key and char in status, since it is one time operation
-        const char = r.GetCharPressed();
-        
-        switch (char) {
-            32...126 => {
-                var c: u8 = @intCast(char);
+        for (status.cur_pressed_chars) | char | {
+            if (char == null) break;
+            switch (char.?) {
+                32...126 => {
+                    var c: u8 = char.?;
 
-                if (r.IsKeyDown(r.KEY_LEFT_SHIFT) or r.IsKeyDown(r.KEY_RIGHT_SHIFT)
-                        or (status.capsLockOn and c >= 'a' and c <= 'z')) {
-                    c = util.upperCaseChar(c);
-                }
+                    if (r.IsKeyDown(r.KEY_LEFT_SHIFT) or r.IsKeyDown(r.KEY_RIGHT_SHIFT)
+                            or (status.caps_lock_on and c >= 'a' and c <= 'z')) {
+                        c = util.upperCaseChar(c);
+                    }
 
-                _ = self.push(c);
-            },
-            else => {}
+                    _ = self.push(c);
+                },
+                else => {}
+            }
         }
-
         if ((r.IsKeyDown(r.KEY_LEFT_CONTROL) or r.IsKeyDown(r.KEY_RIGHT_CONTROL))) {
             // batch delete
             self.handleOneKeyDown(&.{r.KEY_W, r.KEY_BACKSPACE}, POP_ALL);
@@ -223,12 +216,12 @@ pub const InputTextField = struct {
             self.color
         );
 
-        self.cursor.draw(&cursor_position);
+        self.cursor.draw(cursor_position);
     }
 };
 
 /// box_size: the size of the box that the input text field is in
-fn getPreferredFontSize(box_size: Vector2, font: r.Font, text: []const u8, cursor: *const Cursor) u16 {
+fn getPreferredFontSize(box_size: Vector2, font: r.Font, text: []const u8, cursor: Cursor) u16 {
     // According to my observation
     // In Raylib, font size is equal to the font's actual display height
     const font_size = @min(
@@ -241,7 +234,7 @@ fn getPreferredFontSize(box_size: Vector2, font: r.Font, text: []const u8, curso
 
 // note: this function cannot be tested using a unit test, since `r.MeasureText` only
 // works after initializing window.
-fn getMaxFontSizeWithWidthLimit(width_limit: f16, font: r.Font, text: []const u8, cursor: *const Cursor) u16 {
+fn getMaxFontSizeWithWidthLimit(width_limit: f16, font: r.Font, text: []const u8, cursor: Cursor) u16 {
     var left: u16 = 0;
     var fz: u16 = undefined;
     var right: u16 = @intFromFloat(width_limit);
@@ -263,7 +256,7 @@ fn getMaxFontSizeWithWidthLimit(width_limit: f16, font: r.Font, text: []const u8
     return res;
 }
 
-fn measureInputTextFieldSize(text: []const u8, cursor: *const Cursor, font: r.Font, font_size: u16) Vector2 {
+fn measureInputTextFieldSize(text: []const u8, cursor: Cursor, font: r.Font, font_size: u16) Vector2 {
     const font_size_f16: f16 = @floatFromInt(font_size);
     const spacing = font_size_f16 * SPACING_RATIO;
     const width = width: {

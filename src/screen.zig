@@ -1,11 +1,11 @@
 const std = @import("std");
 const status = @import("status.zig");
-pub const InputUserScreen = @import("screen/input_user.zig").InputUserScreen;
+pub const MainScreen = @import("screen/main.zig").MainScreen;
 
-pub var input_user_screen: InputUserScreen = undefined;
+pub var main_screen: MainScreen = undefined;
 
 pub const RayGreetScreen = union(enum) {
-    input_user_screen: *InputUserScreen,
+    main_screen: *MainScreen,
 
     pub fn draw(self: RayGreetScreen) !void {
         try switch (self) {

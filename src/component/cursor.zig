@@ -31,19 +31,22 @@ pub const Cursor = struct {
         self._frame_counter = 0;
     }
 
-    pub fn draw(self: *Cursor, position: *const Vector2) void {
-        if (status.pressedKey != null) {
+    pub fn resetBlink(self: *Cursor) void {
+        if (self.blink != 0) {
             self._show = true;
             self._frame_counter = 0;
-       } else {
-            if (self.blink != 0) {
-                self._frame_counter = (self._frame_counter + 1) % self.blink;
-                if (self._frame_counter == 0) {
-                    self._show = !self._show;
-                }
-                if (!self._show) {
-                    return;
-                }
+        }
+    }
+
+    pub fn draw(self: *Cursor, position: Vector2) void {
+        // blink
+        if (self.blink != 0) {
+            self._frame_counter = (self._frame_counter + 1) % self.blink;
+            if (self._frame_counter == 0) {
+                self._show = !self._show;
+            }
+            if (!self._show) {
+                return;
             }
         }
         

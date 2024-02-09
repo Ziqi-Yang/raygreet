@@ -32,7 +32,8 @@ const setup_cmd: CommandT = .{
 pub fn main() !void {
     var gpa_impl = std.heap.GeneralPurposeAllocator(.{}){};
     defer if (gpa_impl.deinit() == .leak) @panic("MEMORY LEAK");
-    var arena_impl = std.heap.ArenaAllocator.init(gpa_impl.allocator());
+    const gpa = gpa_impl.allocator();
+    var arena_impl = std.heap.ArenaAllocator.init(gpa);
     defer arena_impl.deinit();
     const arena = arena_impl.allocator();
     
@@ -60,7 +61,7 @@ pub fn main() !void {
     defer r.CloseWindow();
     r.SetTargetFPS(CONFIG.fps);
     
-    screen.main_screen = try screen.MainScreen.new();
+    screen.main_screen = try screen.MainScreen.new(gpa);
     screen.main_screen.init();
 
     status.current_screen = RayGreetScreen {
@@ -73,6 +74,8 @@ pub fn main() !void {
         try status.current_screen.draw();
         r.EndDrawing();
     }
+
+    screen.resetAll();
 }
 
 fn handleKey() void {

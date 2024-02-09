@@ -40,7 +40,7 @@ pub const InputTextField = struct {
     const POP_ALL = PopAll {};
     const KEY_BACKSPACE_POP_CHAR = PopChar {};
 
-    text: [MAX_TEXT_LEN: '\x00']u8 = [_: '\x00']u8{'\x00'} ** MAX_TEXT_LEN,
+    text: [MAX_TEXT_LEN: 0]u8 = [_: 0]u8{0} ** MAX_TEXT_LEN,
     _text_index: u8 = 0,
     font: r.Font,
     font_size: u16 = undefined,
@@ -103,6 +103,10 @@ pub const InputTextField = struct {
         self.cursor_offset[1] = cursor_offset_y;
 
         
+    }
+
+    pub fn getTextAlloc(self: *Self, allocator: std.mem.Allocator) ![]u8 {
+        return allocator.dupe(u8, self.text[0..self._text_index]);
     }
 
     /// return whether push success (the reason to fail: size full) and update

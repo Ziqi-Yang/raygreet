@@ -1,12 +1,13 @@
 const r = @cImport(@cInclude("raylib.h"));
 const Vector2 = @import("../util.zig").Vector2;
 const status = @import("../status.zig");
+const Box = @import("box.zig").Box;
 
 pub const Cursor = struct {
     _show: bool = true,
     _frame_counter: u8 = 0,
     /// don't directly set size
-    size: Vector2 = .{ 10.0, 10.0},
+    box: Box,
     color: r.Color,
     /// per num frame changes hide/show status (0 means no blink)
     blink: u8 = 0,
@@ -14,7 +15,7 @@ pub const Cursor = struct {
 
     pub fn setSize(self: *Cursor, font_size: u16) Vector2 {
         const size: Vector2 = self.calculateSize(font_size);
-        self.size = size;
+        self.box.size = size;
         return size;
     }
 
@@ -38,7 +39,7 @@ pub const Cursor = struct {
         }
     }
 
-    pub fn draw(self: *Cursor, position: Vector2) void {
+    pub fn draw(self: *Cursor, outer_offset: Vector2) void {
         // blink
         if (self.blink != 0) {
             self._frame_counter = (self._frame_counter + 1) % self.blink;
@@ -49,19 +50,22 @@ pub const Cursor = struct {
                 return;
             }
         }
+
+        const offset = outer_offset + self.box.offset;
+        const box_size = self.box.getSize();
         
         r.DrawRectangle(
-            @intFromFloat(position[0]),
-            @intFromFloat(position[1]),
-            @intFromFloat(self.size[0]),
-            @intFromFloat(self.size[1]),
+            @intFromFloat(offset[0]),
+            @intFromFloat(offset[1]),
+            @intFromFloat(box_size[0]),
+            @intFromFloat(box_size[1]),
             self.color
         );
     } 
 };
 
 pub const CursorType = enum {
-    // see emacs
+    // Emacs
     Box,
     Bar,
     Hbar,

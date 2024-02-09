@@ -5,16 +5,25 @@ const Cursor = @import("../component/cursor.zig").Cursor;
 const CursorOption = @import("../config.zig").CursorOption;
 const InputTextField = @import("../component/input_text_field.zig").InputTextField;
 
+const greetd_ipc = @import("greetd_ipc");
+const GreetdIPC = greetd_ipc.GreetdIPC;
+const Request = greetd_ipc.Request;
+const Response = greetd_ipc.Response;
+
 pub const MainScreen = struct {
+    pub const State = union(enum) {
+        input_user: ?Response, 
+        input_password: ?Response,
+        answer_question: ?Response,
+    };
+
     const Self = @This();
 
-    state: State = State.input_user,
+    state: State = .{ .input_user = null },
     screen_size: Vector2,
     input_text_field: InputTextField,
     allocator: std.mem.Allocator,
-
-    var user_name: []const u8 = undefined;
-    var password: []const u8 = undefined;
+    gipc: GreetdIPC,
 
     pub fn new(allocator: std.mem.Allocator) !Self {
         if (!r.IsWindowReady()) return error.WindowNotInitialized;
@@ -28,7 +37,8 @@ pub const MainScreen = struct {
             // pointer it returned points to the old `screen` (if we define a var), not the one copied
             // in the `return` caluse. (stack lifetime issue)
             .input_text_field = try InputTextField.new(box_size, null),
-            .allocator = allocator
+            .allocator = allocator,
+            .gipc = try GreetdIPC.new(null, allocator)
         };
     }
 
@@ -36,38 +46,86 @@ pub const MainScreen = struct {
         self.input_text_field.func_enter_key_down = self.enter_key_press_func();
     }
 
-    pub fn reset(self: *Self) void {
-        switch (self.state) {
-            .input_user => {},
-            .input_password => {
-                self.allocator.free(user_name);
-            },
-            .verification => {
-                self.allocator.free(user_name);
-                self.allocator.free(password);
-            }
-        }
-        self.state = .input_user;
+    pub fn deinit(self: *Self) void {
+        self.gipc.deinit();
     }
 
     pub fn draw(self: *Self) !void {
         r.ClearBackground(r.RAYWHITE);
+        const response: ?Response = switch (self.state) {
+            inline else => |*v| blk: {
+                const old = v.*;
+                v.* = null;
+                break :blk old;
+            }
+        };
+        _ = response;
         self.input_text_field.draw(Vector2 { self.screen_size[0] * 0.15 , self.screen_size[1] / 4 });
     }
 
-    pub fn nextState(self: *Self) !void {
+    pub fn _authenticate(self: *Self, req: Request) !void {
+        try self.gipc.sendMsg(req);
+        const resp = try self.gipc.readMsg();
+        switch (resp) {
+            .success => {
+                switch (req) {
+                    .create_session => {
+                        // TODO test a user without password
+                    },
+                    .post_auth_message_response => {
+                        // start session
+                        // TODO 
+                    },
+                    .start_session,
+                    .cancel_session => {
+                        // exit
+                        r.CloseWindow();
+                    },
+                }
+            },
+            .err => {
+                // handle error
+            },
+            .auth_message => |auth_msg| {
+                switch (auth_msg.auth_message_type) {
+                    .visible => {
+                        self.state = .{ .answer_question = resp };
+                        self.input_text_field.reset();
+                    },
+                    .secret => {
+                        self.state = .{ .input_password = resp };
+                        self.input_text_field.reset();
+                    },
+                    else => {
+                        switch (self.state) {
+                            inline else => |*v| v.* = resp,
+                        }
+                    }
+                }
+            }
+        }
+    } 
+
+    pub fn authenticate(self: *Self) !void {
         switch (self.state) {
             .input_user => {
-                user_name = try self.input_text_field.getTextAlloc(self.allocator);
-                self.state = .input_password;
+                const text = try self.input_text_field.getTextAlloc(self.allocator);
+                errdefer self.allocator.free(text);
+                defer self.allocator.free(text);
+
+                const req: Request = .{ .create_session = .{ .username = text }};
+                try self._authenticate(req);
             },
-            .input_password => {
-                password = try self.input_text_field.getTextAlloc(self.allocator);
-                self.state = .verification;
+            .input_password,
+            .answer_question => {
+                const text = try self.input_text_field.getTextAlloc(self.allocator);
+                errdefer self.allocator.free(text);
+                defer self.allocator.free(text);
+
+                const req: Request = .{ .post_auth_message_response = .{ .response = text} };
+                try self._authenticate(req);
             },
-            .verification => {}
         }
-        self.input_text_field.reset();
     }
 
     pub inline fn enter_key_press_func(self: *Self) *const fn () void {
@@ -80,7 +138,7 @@ pub const MainScreen = struct {
             }
 
             fn run() void {
-                screen.nextState() catch {
+                screen.authenticate() catch {
                     // TODO
                     std.debug.print("{s}\n", .{"Error Occurs"});
                 };
@@ -89,8 +147,3 @@ pub const MainScreen = struct {
     }
 };
 
-pub const State = enum {
-    input_user,
-    input_password,
-    verification
-};

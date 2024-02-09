@@ -6,6 +6,9 @@ const r = @cImport(@cInclude("raylib.h"));
 const config = @import("../config.zig");
 const status = @import("../status.zig");
 const util = @import("../util.zig");
+const i_box = @import("box.zig");
+const Box = i_box.Box;
+const constants = @import("../constants.zig");
 
 const MAX_TEXT_LEN = 255;
 const SPACING_RATIO: f16 = 0.1; // spacing = text_size * spacing_ratio
@@ -42,13 +45,11 @@ pub const InputTextField = struct {
 
     text: [MAX_TEXT_LEN: 0]u8 = [_: 0]u8{0} ** MAX_TEXT_LEN,
     _text_index: u8 = 0,
+    box: Box,
+    cursor: Cursor,
     font: r.Font,
     font_size: u16 = undefined,
-    box_size: Vector2,
-    offset: Vector2 = Vector2 {0, 0},
     color: r.Color = r.DARKGRAY,
-    cursor: Cursor,
-    cursor_offset: Vector2 = Vector2 {0, 0},
     frames_per_key_down: u8,
     func_enter_key_down: ?*const fn () void,
     
@@ -66,13 +67,16 @@ pub const InputTextField = struct {
         const cursor: Cursor = .{
             .color = r.GRAY,
             .blink = CONFIG.cursor._blink,
-            .type = CONFIG.cursor.type
+            .type = CONFIG.cursor.type,
+            .box = .{}
         };
 
         var res: Self = .{
             .font = font,
             // font_size
-            .box_size = box_size,
+            .box = .{
+                .size = box_size
+            },
             .cursor = cursor,
             .frames_per_key_down = CONFIG._frames_per_key_down,
             .func_enter_key_down = func_enter_key_down
@@ -81,28 +85,34 @@ pub const InputTextField = struct {
         return res;
     }
 
-    /// update font_size, offset, cursor.size and cursor_offset field
+    /// update font_size, offset, cursor field
     pub fn update(self: *Self) void {
-        // TODO
         const text = &self.text;
-        const font_size = getPreferredFontSize(self.box_size, self.font, text, self.cursor);
+        const font_size = i_box.getPreferredFontSize(
+            self.box.getSize(),
+            text,
+            self.font,
+            constants.TEXT_SPACING_RATIO,
+            self.cursor
+        );
         self.font_size = font_size;
         
-        const text_size = measureInputTextFieldSize(text, self.cursor, self.font, font_size);
-        
-        const offset_x = (self.box_size[0] - text_size[0]) / 2;
-        const offset_y = (self.box_size[1] - text_size[1]) / 2;
-        self.offset[0] = offset_x;
-        self.offset[1] = offset_y;
+        const text_size = i_box.measureTextBoxSize(
+            text,
+            self.font,
+            font_size,
+            constants.TEXT_SPACING_RATIO,
+            self.cursor
+        );
+
+        const box_size = self.box.getSize();
+        const offset = (box_size - text_size) / Vector2 {2, 2};
+        self.box.setOffset(offset);
         
         const cursor_size = self.cursor.setSize(font_size);
         // std.debug.print("{} # {} # {}\n", .{text_size, cursor_size, @as(f16, @floatFromInt(r.MeasureText(@ptrCast(self.text), font_size)))});
-        const cursor_offset_x = (offset_x + text_size[0] - cursor_size[0]);
-        const cursor_offset_y = (offset_y + text_size[1] - cursor_size[1]);
-        self.cursor_offset[0] = cursor_offset_x;
-        self.cursor_offset[1] = cursor_offset_y;
-
-        
+        const cursor_offset = offset + text_size - cursor_size;
+        self.cursor.box.setOffset(cursor_offset);
     }
 
     pub fn getTextAlloc(self: *Self, allocator: std.mem.Allocator) ![]u8 {
@@ -202,14 +212,11 @@ pub const InputTextField = struct {
         
         const text = &self.text;
         // std.debug.print("{s}\n", .{text});
-        const position = outer_offset + self.offset;
+        const position = outer_offset + self.box.getOffset();
         const position_r = r.Vector2 {
             .x = position[0],
             .y = position[1]
         };
-        const cursor_position = outer_offset + self.cursor_offset;
-
-        // std.debug.print(">{}\n", .{cursor_position});
         
         r.DrawTextEx(
             self.font,
@@ -220,62 +227,7 @@ pub const InputTextField = struct {
             self.color
         );
 
-        self.cursor.draw(cursor_position);
+        self.cursor.draw(outer_offset);
     }
 };
 
-/// box_size: the size of the box that the input text field is in
-fn getPreferredFontSize(box_size: Vector2, font: r.Font, text: []const u8, cursor: Cursor) u16 {
-    // According to my observation
-    // In Raylib, font size is equal to the font's actual display height
-    const font_size = @min(
-        @as(u16, @intFromFloat(box_size[1])),
-        getMaxFontSizeWithWidthLimit(box_size[0], font, text, cursor)
-    );
-
-    return font_size;
-}
-
-// note: this function cannot be tested using a unit test, since `r.MeasureText` only
-// works after initializing window.
-fn getMaxFontSizeWithWidthLimit(width_limit: f16, font: r.Font, text: []const u8, cursor: Cursor) u16 {
-    var left: u16 = 0;
-    var fz: u16 = undefined;
-    var right: u16 = @intFromFloat(width_limit);
-    var res: u16 = left;
-    while (left <= right) {
-        fz = left + (right - left) / 2;
-        const text_width = measureInputTextFieldSize(text, cursor, font, fz)[0];
-        
-        // std.debug.print(">{} {} {}\n", .{fz, text_width, width_limit});
-        
-        if (text_width <= width_limit) {
-            res = fz;
-            left = fz + 1;
-        } else {
-            right = fz - 1;
-        }
-    }
-    // std.debug.print("{}\n", .{res});
-    return res;
-}
-
-fn measureInputTextFieldSize(text: []const u8, cursor: Cursor, font: r.Font, font_size: u16) Vector2 {
-    const font_size_f16: f16 = @floatFromInt(font_size);
-    const spacing = font_size_f16 * SPACING_RATIO;
-    const width = width: {
-        var width: f32 = cursor.calculateSize(font_size)[0];
-        if (!std.mem.eql(u8, text, "")) {
-            width +=
-                r.MeasureTextEx(
-                    font,
-                    @ptrCast(text),
-                    font_size_f16,
-                    spacing).x
-                + spacing;
-        }
-        break :width width;
-    };
-
-    return .{ @floatCast(width), font_size_f16};
-}

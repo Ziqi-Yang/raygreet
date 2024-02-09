@@ -10,9 +10,6 @@ const RayGreetScreen = screen.RayGreetScreen;
 const Vector2 = @import("util.zig").Vector2;
 const status = @import("status.zig");
 
-const greetd_ipc = @import("greetd_ipc"); // TODO
-const GreetdIPC = greetd_ipc.GreetdIPC;
-
 // override default log settings
 pub const std_options = struct {
     pub const log_level = .debug;
@@ -75,7 +72,7 @@ pub fn main() !void {
         r.EndDrawing();
     }
 
-    screen.resetAll();
+    screen.deinitAllScreen();
 }
 
 fn handleKey() void {

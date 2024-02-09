@@ -14,7 +14,7 @@ pub const RayGreetScreen = union(enum) {
     }
 };
 
-/// reset all screens (and clean memory)
-pub fn resetAll() void {
-    main_screen.reset();
+pub fn deinitAllScreen() void {
+    main_screen.deinit();
 }
+

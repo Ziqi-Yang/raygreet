@@ -1,9 +1,9 @@
 run:
-    zig build run
+    fakegreet "zig build run"
 
 doc:
     pandoc -o ./README.md ./README.typ 
     
 drm:
     zig build -Dplatform_drm
-    sudo ./zig-out/bin/raygreet
+    sudo fakegreet "zig-out/bin/raygreet"

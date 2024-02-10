@@ -2,6 +2,11 @@
 // be used with Vector2 struct in raylib(Zig seems them as different struct,
 // so no operation can do with Vector2 in raylib/raymath)
 pub const Vector2 = @Vector(2, f16);
+const RV2 = @cImport(@cInclude("raylib.h")).Vector2;
+
+pub inline fn V2toRV2(v: Vector2) RV2 {
+    return .{.x = v[0], .y = v[1]};
+}
 
 
 

@@ -1,5 +1,6 @@
 const std = @import("std");
-const Vector2 = @import("../util.zig").Vector2;
+const util = @import("../util.zig");
+const Vector2 = util.Vector2;
 const r = @cImport(@cInclude("raylib.h"));
 const Cursor = @import("cursor.zig").Cursor;
 const constants = @import("../constants.zig");
@@ -71,7 +72,7 @@ pub const ColorBox = struct {
 
     pub fn draw(self: *Self, outer_offset: Vector2) void {
         const offset = outer_offset + self.box.offset;
-        r.DrawRectangleV(offset, self.box.size, self.bg_color);
+        r.DrawRectangleV(util.V2toRV2(offset), util.V2toRV2(self.box.size), self.bg_color);
     }
 };
 
@@ -82,23 +83,32 @@ pub const Label = struct {
     fg_color: r.Color,
     text: []const u8,
     font_size: u16 = undefined,
-    font: ?r.Font,
+    font: r.Font,
 
     pub fn new(
-        offset: Vector2,
+        /// If one field (x, y) of it is 0.0, then don't limit that field.
         size: Vector2,
         bg_color: r.Color,
         fg_color: r.Color,
         text: []const u8,
-        font_: ?r.Font,
-    ) !Self {
-        const font = if (font_) |f| f else blk: {
-            if (!r.IsWindowReady()) return error.WindowNotInitialized;
-            break :blk r.GetFontDefault();   
-        };
-        const font_size = getPreferredFontSize(size, text, font, constants.TEXT_SPACING_RATIO, null);
+        font: r.Font,
+    ) Self {
+        const font_size = getPreferredFontSize(
+            size * Vector2 { 0.9, 0.9 },
+            text,
+            font,
+            constants.TEXT_SPACING_RATIO,
+            null
+        );
+        var calculated_size = size;
+        if (calculated_size[0] == 0.0 or calculated_size[1] == 0.0) {
+            const m_size = measureTextBoxSize(text, font, font_size, constants.TEXT_SPACING_RATIO, null);
+            if (calculated_size[0] == 0.0) calculated_size[0] = m_size[0] * 1.1;
+            if (calculated_size[1] == 0.0) calculated_size[1] = m_size[1] * 1.1;
+        }
+
         return .{
-            .box = ColorBox.new(offset, size, bg_color),
+            .box = ColorBox.new(.{0.0, 0.0}, calculated_size, bg_color),
             .fg_color = fg_color,
             .text = text,
             .font_size = font_size,
@@ -109,16 +119,31 @@ pub const Label = struct {
     pub fn draw(self: *Self, outer_offset: Vector2) void {
         self.box.draw(outer_offset);
         const offset = outer_offset + self.box.getOffset();
-        const spacing = self.font_size * constants.TEXT_SPACING_RATIO;
-        r.DrawTextEx(self.font, self.text, offset, self.font_size, spacing, self.fg_color);
+        const spacing = @as(f16, @floatFromInt(self.font_size)) * constants.TEXT_SPACING_RATIO;
+        r.DrawTextEx(
+            self.font,
+            @ptrCast(self.text),
+            util.V2toRV2(offset + self.box.getSize() * Vector2 { 0.05, 0.05 }),
+            @floatFromInt(self.font_size),
+            spacing,
+            self.fg_color
+        );
     }
 };
 
 
 /// box_size: the size of the box that the input text field is in
+/// If one field of it is 0.0, then don't limit the font size in that field.
 pub fn getPreferredFontSize(box_size: Vector2, text: []const u8, font: r.Font, spacing_ratio: f16, cursor: ?Cursor) u16 {
     // According to my observation
     // In Raylib, font size is equal to the font's actual display height
+    if (box_size[0] == 0.0 and box_size[1] == 0.0) {
+        @panic("box_size passed in couldn't be .{0.0, 0.0}!");
+    } else if (box_size[0] == 0.0) {
+        return @as(u16, @intFromFloat(box_size[1]));
+    } else if (box_size[1] == 0.0) {
+        return getMaxFontSizeWithWidthLimit(box_size[0], text, font, spacing_ratio, cursor);
+    }
     const font_size = @min(
         @as(u16, @intFromFloat(box_size[1])),
         getMaxFontSizeWithWidthLimit(box_size[0], text, font, spacing_ratio, cursor)

@@ -4,6 +4,7 @@ const Vector2 = @import("../util.zig").Vector2;
 const Cursor = @import("../component/cursor.zig").Cursor;
 const CursorOption = @import("../config.zig").CursorOption;
 const InputTextField = @import("../component/input_text_field.zig").InputTextField;
+const Label = @import("../component/box.zig").Label;
 
 const greetd_ipc = @import("greetd_ipc");
 const GreetdIPC = greetd_ipc.GreetdIPC;
@@ -21,22 +22,32 @@ pub const MainScreen = struct {
 
     state: State = .{ .input_user = null },
     screen_size: Vector2,
-    input_text_field: InputTextField,
     allocator: std.mem.Allocator,
     gipc: GreetdIPC,
+    input_text_field: InputTextField,
+    title: Label,
 
     pub fn new(allocator: std.mem.Allocator) !Self {
         if (!r.IsWindowReady()) return error.WindowNotInitialized;
         
         const SCREEN_WIDTH: f16 = @floatFromInt(@as(u16, @intCast(r.GetScreenWidth())));
         const SCREEN_HEIGHT: f16 = @floatFromInt(@as(u16, @intCast(r.GetScreenHeight())));
-        const box_size: Vector2 = .{ SCREEN_WIDTH * 0.7, SCREEN_HEIGHT / 2};
+        const input_text_field_box_size: Vector2 = .{ SCREEN_WIDTH * 0.7, SCREEN_HEIGHT / 2};
+        
+        const title_box_size: Vector2 = .{ 0.0, SCREEN_HEIGHT * 0.1 }; // don't limit the width
         return .{
             .screen_size = .{ SCREEN_WIDTH, SCREEN_HEIGHT },
             // we don't pass enter_key_press_func() in `InputTextField.new` since the function
             // pointer it returned points to the old `screen` (if we define a var), not the one copied
             // in the `return` caluse. (stack lifetime issue)
-            .input_text_field = try InputTextField.new(box_size, null),
+            .title = Label.new(
+                title_box_size,
+                r.BLACK,
+                r.LIGHTGRAY,
+                "USERNAME",
+                r.GetFontDefault()
+            ),
+            .input_text_field = try InputTextField.new(input_text_field_box_size, null),
             .allocator = allocator,
             .gipc = try GreetdIPC.new(null, allocator)
         };
@@ -60,7 +71,8 @@ pub const MainScreen = struct {
             }
         };
         _ = response;
-        self.input_text_field.draw(Vector2 { self.screen_size[0] * 0.15 , self.screen_size[1] / 4 });
+        self.title.draw( self.screen_size * Vector2 { 0.1, 0.075 } );
+        self.input_text_field.draw( self.screen_size * Vector2 { 0.15, 0.25 } );
     }
 
     pub fn _authenticate(self: *Self, req: Request) !void {

@@ -6,6 +6,8 @@ const CursorOption = @import("../config.zig").CursorOption;
 const InputTextField = @import("../component/input_text_field.zig").InputTextField;
 const Label = @import("../component/box.zig").Label;
 
+const ArenaAllocator = std.heap.ArenaAllocator;
+
 const greetd_ipc = @import("greetd_ipc");
 const GreetdIPC = greetd_ipc.GreetdIPC;
 const Request = greetd_ipc.Request;
@@ -14,7 +16,6 @@ const Response = greetd_ipc.Response;
 pub const MainScreen = struct {
     pub const State = union(enum) {
         input_user: ?Response, 
-        input_password: ?Response,
         answer_question: ?Response,
     };
 
@@ -22,7 +23,7 @@ pub const MainScreen = struct {
 
     state: State = .{ .input_user = null },
     screen_size: Vector2,
-    allocator: std.mem.Allocator,
+    arena_impl: *ArenaAllocator,
     gipc: GreetdIPC,
     input_text_field: InputTextField,
     title: Label,
@@ -35,22 +36,24 @@ pub const MainScreen = struct {
         const input_text_field_box_size: Vector2 = .{ SCREEN_WIDTH * 0.7, SCREEN_HEIGHT / 2};
         
         const title_box_size: Vector2 = .{ 0.0, SCREEN_HEIGHT * 0.1 }; // don't limit the width
-        return .{
+        const main_screen = .{
             .screen_size = .{ SCREEN_WIDTH, SCREEN_HEIGHT },
             // we don't pass enter_key_press_func() in `InputTextField.new` since the function
             // pointer it returned points to the old `screen` (if we define a var), not the one copied
             // in the `return` caluse. (stack lifetime issue)
             .title = Label.new(
                 title_box_size,
-                r.BLACK,
+                r.DARKGRAY,
                 r.LIGHTGRAY,
-                "USERNAME",
+                "Username:",
                 r.GetFontDefault()
             ),
             .input_text_field = try InputTextField.new(input_text_field_box_size, null),
-            .allocator = allocator,
+            .arena_impl = try allocator.create(ArenaAllocator),
             .gipc = try GreetdIPC.new(null, allocator)
         };
+        main_screen.arena_impl.* = ArenaAllocator.init(allocator);
+        return main_screen;
     }
 
     pub fn init(self: *Self) void {
@@ -58,6 +61,9 @@ pub const MainScreen = struct {
     }
 
     pub fn deinit(self: *Self) void {
+        const allocator = self.arena_impl.child_allocator;
+        self.arena_impl.deinit();
+        allocator.destroy(self.arena_impl);
         self.gipc.deinit();
     }
 
@@ -71,11 +77,26 @@ pub const MainScreen = struct {
             }
         };
         _ = response;
-        self.title.draw( self.screen_size * Vector2 { 0.1, 0.075 } );
+        self.title.draw( self.screen_size * Vector2 { 0.05, 0.075 } );
         self.input_text_field.draw( self.screen_size * Vector2 { 0.15, 0.25 } );
     }
 
-    pub fn _authenticate(self: *Self, req: Request) !void {
+    fn updateState(self: *Self, state: State) !void {
+        const arena = self.arena_impl.allocator();
+        switch (state) {
+            .input_user => {
+                self.title.updateText("USERNAME");
+            },
+            .answer_question => | resp | {
+                const text = try arena.dupeZ(u8, resp.?.auth_message.auth_message);
+                self.title.updateText(text);
+            }
+        }
+        self.input_text_field.reset();
+        self.state = state;
+    }
+
+    fn _authenticate(self: *Self, req: Request) !void {
         try self.gipc.sendMsg(req);
         const resp = try self.gipc.readMsg();
         switch (resp) {
@@ -95,18 +116,24 @@ pub const MainScreen = struct {
                     },
                 }
             },
-            .err => {
+            .err => |err| {
                 // handle error
+                _ = err;
+                // switch (err.err_type) {
+                //     .auth_error => {
+                //         res = LoginResult.failure;
+                //     },
+                //     .@"error" => {
+                //         try stderr.print("login error: {s}", .{err.description});
+                //     }
+                // }
             },
             .auth_message => |auth_msg| {
                 switch (auth_msg.auth_message_type) {
-                    .visible => {
-                        self.state = .{ .answer_question = resp };
-                        self.input_text_field.reset();
-                    },
+                    .visible,
                     .secret => {
-                        self.state = .{ .input_password = resp };
-                        self.input_text_field.reset();
+                        const state = .{ .answer_question = resp };
+                        try self.updateState(state);
                     },
                     else => {
                         switch (self.state) {
@@ -119,20 +146,16 @@ pub const MainScreen = struct {
     } 
 
     pub fn authenticate(self: *Self) !void {
+        const arena = self.arena_impl.allocator();
         switch (self.state) {
             .input_user => {
-                const text = try self.input_text_field.getTextAlloc(self.allocator);
-                errdefer self.allocator.free(text);
-                defer self.allocator.free(text);
+                const text = try self.input_text_field.getTextAlloc(arena);
 
                 const req: Request = .{ .create_session = .{ .username = text }};
                 try self._authenticate(req);
             },
-            .input_password,
             .answer_question => {
-                const text = try self.input_text_field.getTextAlloc(self.allocator);
-                errdefer self.allocator.free(text);
-                defer self.allocator.free(text);
+                const text = try self.input_text_field.getTextAlloc(arena);
 
                 const req: Request = .{ .post_auth_message_response = .{ .response = text} };
                 try self._authenticate(req);

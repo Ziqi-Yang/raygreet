@@ -93,27 +93,32 @@ pub const Label = struct {
         text: []const u8,
         font: r.Font,
     ) Self {
+        var label: Self = .{
+            .box = ColorBox.new(.{0.0, 0.0}, size, bg_color),
+            .fg_color = fg_color,
+            .text = text,
+            .font_size = undefined,
+            .font = font
+        };
+        label.updateText(text);
+        return label;
+    }
+
+    pub fn updateText(self: *Self, text: []const u8) void {
         const font_size = getPreferredFontSize(
-            size * Vector2 { 0.9, 0.9 },
+            self.box.getSize() * Vector2 { 0.9, 0.9 },
             text,
-            font,
+            self.font,
             constants.TEXT_SPACING_RATIO,
             null
         );
-        var calculated_size = size;
-        if (calculated_size[0] == 0.0 or calculated_size[1] == 0.0) {
-            const m_size = measureTextBoxSize(text, font, font_size, constants.TEXT_SPACING_RATIO, null);
-            if (calculated_size[0] == 0.0) calculated_size[0] = m_size[0] * 1.1;
-            if (calculated_size[1] == 0.0) calculated_size[1] = m_size[1] * 1.1;
-        }
+        self.font_size = font_size;
+            
+        const m_size = measureTextBoxSize(text, self.font, font_size, constants.TEXT_SPACING_RATIO, null);
+        const calculated_size = m_size * Vector2 { 1.1, 1.1 };
+        self.box.setSize(calculated_size);
 
-        return .{
-            .box = ColorBox.new(.{0.0, 0.0}, calculated_size, bg_color),
-            .fg_color = fg_color,
-            .text = text,
-            .font_size = font_size,
-            .font = font
-        };
+        self.text = text;
     }
 
     pub fn draw(self: *Self, outer_offset: Vector2) void {

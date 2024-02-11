@@ -64,7 +64,7 @@ pub fn main() !void {
     status.current_screen = RayGreetScreen {
         .main_screen = &screen.main_screen,
     };
-
+    
     while (!r.WindowShouldClose()) {
         handleKey();
         r.BeginDrawing();

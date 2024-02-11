@@ -46,7 +46,8 @@ pub const MainScreen = struct {
             // we don't pass enter_key_press_func() in `InputTextField.new` since the function
             // pointer it returned points to the old `screen` (if we define a var), not the one copied
             // in the `return` caluse. (stack lifetime issue)
-            .title = Label.new(
+            .title = try Label.new(
+                allocator,
                 title_box_size,
                 r.DARKGRAY,
                 r.LIGHTGRAY,
@@ -70,6 +71,7 @@ pub const MainScreen = struct {
         self.arena_impl.deinit();
         allocator.destroy(self.arena_impl);
         self.gipc.deinit();
+        self.title.deinit();
     }
 
     pub fn draw(self: *Self) !void {
@@ -93,11 +95,11 @@ pub const MainScreen = struct {
         const arena = self.arena_impl.allocator();
         switch (state) {
             .input_user => {
-                self.title.updateText("USERNAME");
+                try self.title.updateText("USERNAME");
             },
             .answer_question => | resp | {
                 const text = try arena.dupeZ(u8, resp.?.auth_message.auth_message);
-                self.title.updateText(text);
+                try self.title.updateText(text);
             }
         }
         self.input_text_field.reset();

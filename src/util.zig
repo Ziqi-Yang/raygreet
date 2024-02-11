@@ -8,8 +8,6 @@ pub inline fn V2toRV2(v: Vector2) RV2 {
     return .{.x = v[0], .y = v[1]};
 }
 
-
-
 // TODO current only support US keymap.
 // note that the left character is mapped from scan code to US keymap.
 // see: https://github.com/raysan5/raylib/discussions/3773

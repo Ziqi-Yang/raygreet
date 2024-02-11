@@ -4,7 +4,8 @@ const Vector2 = @import("../util.zig").Vector2;
 const Cursor = @import("../component/cursor.zig").Cursor;
 const CursorOption = @import("../config.zig").CursorOption;
 const InputTextField = @import("../component/input_text_field.zig").InputTextField;
-const Label = @import("../component/box.zig").Label;
+const i_text = @import("../component/text.zig");
+const Label = i_text.Label;
 
 const ArenaAllocator = std.heap.ArenaAllocator;
 
@@ -27,6 +28,10 @@ pub const MainScreen = struct {
     gipc: GreetdIPC,
     input_text_field: InputTextField,
     title: Label,
+
+    const title_offset = Vector2 { 0.05, 0.075 };
+    const input_text_field_offset = Vector2 { 0.15, 0.25 };
+    var error_log: ?[]const u8 = null;
 
     pub fn new(allocator: std.mem.Allocator) !Self {
         if (!r.IsWindowReady()) return error.WindowNotInitialized;
@@ -77,8 +82,11 @@ pub const MainScreen = struct {
             }
         };
         _ = response;
-        self.title.draw( self.screen_size * Vector2 { 0.05, 0.075 } );
-        self.input_text_field.draw( self.screen_size * Vector2 { 0.15, 0.25 } );
+        const title_position = self.screen_size * title_offset ;
+        self.title.draw(title_position);
+        self.input_text_field.draw( self.screen_size * input_text_field_offset );
+        // if (error_log) |log| {
+        // }
     }
 
     fn updateState(self: *Self, state: State) !void {

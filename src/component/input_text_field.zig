@@ -6,8 +6,8 @@ const r = @cImport(@cInclude("raylib.h"));
 const config = @import("../config.zig");
 const status = @import("../status.zig");
 const util = @import("../util.zig");
-const i_box = @import("box.zig");
-const Box = i_box.Box;
+const Box = @import("box.zig").Box;
+const i_text = @import("text.zig");
 const constants = @import("../constants.zig");
 
 const MAX_TEXT_LEN = 255;
@@ -88,7 +88,7 @@ pub const InputTextField = struct {
     /// update font_size, offset, cursor field
     pub fn update(self: *Self) void {
         const text = &self.text;
-        const font_size = i_box.getPreferredFontSize(
+        const font_size = i_text.getPreferredFontSize(
             self.box.getSize(),
             text,
             self.font,
@@ -97,7 +97,7 @@ pub const InputTextField = struct {
         );
         self.font_size = font_size;
         
-        const text_size = i_box.measureTextBoxSize(
+        const text_size = i_text.measureTextBoxSize(
             text,
             self.font,
             font_size,

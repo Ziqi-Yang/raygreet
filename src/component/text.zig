@@ -117,7 +117,7 @@ pub const Label = struct {
         var m_size = measureTextBoxSize(
             text,
             self.font,
-            @intFromFloat(font_size),
+            font_size,
             constants.TEXT_SPACING_RATIO,
             null
         );
@@ -139,7 +139,7 @@ pub const Label = struct {
                 m_size = measureTextBoxSize(
                     adjusted_text,
                     self.font,
-                    @intFromFloat(font_size),
+                    font_size,
                     constants.TEXT_SPACING_RATIO,
                     null
                 );
@@ -159,7 +159,7 @@ pub const Label = struct {
             m_size = measureTextBoxSize(
                 adjusted_text,
                 self.font,
-                @intFromFloat(font_size),
+                font_size,
                 constants.TEXT_SPACING_RATIO,
                 null
             );
@@ -328,7 +328,7 @@ pub fn getMaxFontSizeWithWidthLimit(width_limit: f16, text: []const u8, font: r.
     var res: u16 = left;
     while (left <= right) {
         fz = left + (right - left) / 2;
-        const text_width = measureTextBoxSize(text, font, fz, spacing_ratio, cursor)[0];
+        const text_width = measureTextBoxSize(text, font, @floatFromInt(fz), spacing_ratio, cursor)[0];
         
         // std.debug.print(">{} {} {}\n", .{fz, text_width, width_limit});
         
@@ -346,15 +346,14 @@ pub fn getMaxFontSizeWithWidthLimit(width_limit: f16, text: []const u8, font: r.
 
 /// measure text box size
 /// spacing_ratio: sapcing = font_size * spacing_ratio
-pub fn measureTextBoxSize(text: []const u8, font: r.Font, font_size: u16, spacing_ratio: f16, cursor: ?Cursor) Vector2 {
-    r.SetTextLineSpacing(font_size);
-    const font_size_f16: f16 = @floatFromInt(font_size);
-    const spacing = font_size_f16 * spacing_ratio;
+pub fn measureTextBoxSize(text: []const u8, font: r.Font, font_size: f16, spacing_ratio: f16, cursor: ?Cursor) Vector2 {
+    r.SetTextLineSpacing(@intFromFloat(font_size));
+    const spacing = font_size * spacing_ratio;
     const text_size =
         r.MeasureTextEx(
             font,
             @ptrCast(text),
-            font_size_f16,
+            font_size,
             spacing);
     var width = text_size.x;
     if (cursor) |csr| {

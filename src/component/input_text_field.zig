@@ -1,5 +1,4 @@
 const std = @import("std");
-const log = std.log;
 const Cursor = @import("cursor.zig").Cursor;
 const Vector2 = @import("../util.zig").Vector2;
 const r = @cImport(@cInclude("raylib.h"));
@@ -10,11 +9,9 @@ const Box = @import("box.zig").Box;
 const i_text = @import("text.zig");
 const constants = @import("../constants.zig");
 
-const MAX_TEXT_LEN = 255;
-const SPACING_RATIO: f16 = 0.1; // spacing = text_size * spacing_ratio
-
 pub const InputTextField = struct {
     const Self = @This();
+    const MAX_TEXT_LEN = 255;
 
     const PopChar = struct {
         var key_down_counter: u8 = 0;
@@ -48,7 +45,7 @@ pub const InputTextField = struct {
     box: Box,
     cursor: Cursor,
     font: r.Font,
-    font_size: u16 = undefined,
+    font_size: f16,
     color: r.Color = r.DARKGRAY,
     frames_per_key_down: u8,
     func_enter_key_down: ?*const fn () void,
@@ -73,7 +70,7 @@ pub const InputTextField = struct {
 
         var res: Self = .{
             .font = font,
-            // font_size
+            .font_size = undefined,
             .box = .{
                 .size = box_size
             },
@@ -88,13 +85,13 @@ pub const InputTextField = struct {
     /// update font_size, offset, cursor field
     pub fn update(self: *Self) void {
         const text = &self.text;
-        const font_size = i_text.getPreferredFontSize(
+        const font_size: f16 = @floatFromInt(i_text.getPreferredFontSize(
             self.box.getSize(),
             text,
             self.font,
             constants.TEXT_SPACING_RATIO,
             self.cursor
-        );
+        ));
         self.font_size = font_size;
         
         const text_size = i_text.measureTextBoxSize(
@@ -110,7 +107,6 @@ pub const InputTextField = struct {
         self.box.setOffset(offset);
         
         const cursor_size = self.cursor.setSize(font_size);
-        // std.debug.print("{} # {} # {}\n", .{text_size, cursor_size, @as(f16, @floatFromInt(r.MeasureText(@ptrCast(self.text), font_size)))});
         const cursor_offset = offset + text_size - cursor_size;
         self.cursor.box.setOffset(cursor_offset);
     }
@@ -222,8 +218,8 @@ pub const InputTextField = struct {
             self.font,
             @ptrCast(text),
             position_r,
-            @floatFromInt(self.font_size),
-            @as(f16, @floatFromInt(self.font_size)) * SPACING_RATIO,
+            self.font_size,
+            self.font_size * constants.TEXT_SPACING_RATIO,
             self.color
         );
 

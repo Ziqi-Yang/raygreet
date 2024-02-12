@@ -13,18 +13,17 @@ pub const Cursor = struct {
     blink: u8 = 0,
     type: CursorType = CursorType.Bar,
 
-    pub fn setSize(self: *Cursor, font_size: u16) Vector2 {
+    pub fn setSize(self: *Cursor, font_size: f16) Vector2 {
         const size: Vector2 = self.calculateSize(font_size);
         self.box.size = size;
         return size;
     }
 
-    pub fn calculateSize(self: *const Cursor, font_size: u16) Vector2 {
-        const fz: f16 = @floatFromInt(font_size);
+    pub fn calculateSize(self: *const Cursor, font_size: f16) Vector2 {
         return switch (self.type) {
-            .Box => .{ fz * 0.75, @floatFromInt(font_size)},
-            .Bar => .{ fz * 0.1, @floatFromInt(font_size)},
-            .Hbar => .{ @floatFromInt(font_size), fz * 0.1 }
+            .Box => .{ font_size * 0.75, font_size},
+            .Bar => .{ font_size * 0.1, font_size},
+            .Hbar => .{ font_size, font_size * 0.1 }
         };
     }
 

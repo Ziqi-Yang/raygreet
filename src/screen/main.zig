@@ -26,8 +26,10 @@ pub const MainScreen = struct {
     screen_size: Vector2,
     arena_impl: *ArenaAllocator,
     gipc: GreetdIPC,
+    
     input_text_field: InputTextField,
     title: Label,
+    log: Label,
 
     const title_offset = Vector2 { 0.05, 0.075 };
     const input_text_field_offset = Vector2 { 0.15, 0.25 };
@@ -41,20 +43,28 @@ pub const MainScreen = struct {
         const input_text_field_box_size: Vector2 = .{ SCREEN_WIDTH * 0.7, SCREEN_HEIGHT / 2};
         
         const title_box_size: Vector2 = .{ 0.0, SCREEN_HEIGHT * 0.1 }; // don't limit the width
+        const title = try Label.new(
+            allocator,
+            title_box_size,
+            r.DARKGRAY,
+            r.LIGHTGRAY,
+            "Username:",
+            r.GetFontDefault()
+        );
         const main_screen = .{
             .screen_size = .{ SCREEN_WIDTH, SCREEN_HEIGHT },
-            // we don't pass enter_key_press_func() in `InputTextField.new` since the function
-            // pointer it returned points to the old `screen` (if we define a var), not the one copied
-            // in the `return` caluse. (stack lifetime issue)
-            .title = try Label.new(
-                allocator,
-                title_box_size,
-                r.DARKGRAY,
-                r.LIGHTGRAY,
-                "Username:",
-                r.GetFontDefault()
-            ),
             .input_text_field = try InputTextField.new(input_text_field_box_size, null),
+            .title = title,
+            .log = try Label.newFixedSize(
+                allocator,
+                .{ SCREEN_WIDTH * 0.9 - title.box.getSize()[0], title.box.getSize()[1] },
+                r.BLANK,
+                r.LIGHTGRAY,
+                "",
+                r.GetFontDefault(),
+                title.font_size / 4,
+                true
+            ),
             .arena_impl = try allocator.create(ArenaAllocator),
             .gipc = try GreetdIPC.new(null, allocator)
         };
@@ -63,6 +73,10 @@ pub const MainScreen = struct {
     }
 
     pub fn init(self: *Self) void {
+        // we don't pass enter_key_press_func() in `InputTextField.new` in `init`
+        // function since the function pointer it returned points to the old
+        // `screen` (if we define a var), not the one copied in the `return`
+        // clause. (stack lifetime issue)
         self.input_text_field.func_enter_key_down = self.enter_key_press_func();
     }
 
@@ -72,6 +86,7 @@ pub const MainScreen = struct {
         allocator.destroy(self.arena_impl);
         self.gipc.deinit();
         self.title.deinit();
+        self.log.deinit();
     }
 
     pub fn draw(self: *Self) !void {

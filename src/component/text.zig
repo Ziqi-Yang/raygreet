@@ -26,11 +26,12 @@ const ArenaAllocator = std.heap.ArenaAllocator;
 pub const Label = struct {
     const Self = @This();
 
-    box: ColorBox,
+    _box: ColorBox, // original box
+    box: ColorBox, // calculated box
     fg_color: r.Color,
     _text: []const u8, // original text
     text: []const u8, // display text (may be modified)
-    font_size: u16 = undefined,
+    font_size: f16 = undefined,
     font: r.Font,
     wrap: bool = false,
     compact: bool = false,
@@ -46,6 +47,7 @@ pub const Label = struct {
         font: r.Font,
     ) !Self {
         var label: Self = .{
+            ._box = ColorBox.new(.{0.0, 0.0}, size, bg_color),
             .box = ColorBox.new(.{0.0, 0.0}, size, bg_color),
             .fg_color = fg_color,
             ._text = text,
@@ -68,10 +70,11 @@ pub const Label = struct {
         fg_color: r.Color,
         text: []const u8,
         font: r.Font,
-        font_size: u16,
+        font_size: f16,
         compact: bool, // TODO
     ) !Self {
         var label: Self = .{
+            ._box = ColorBox.new(.{0.0, 0.0}, size, bg_color),
             .box = ColorBox.new(.{0.0, 0.0}, size, bg_color),
             .fg_color = fg_color,
             ._text = text,
@@ -96,21 +99,21 @@ pub const Label = struct {
     pub fn updateText(self: *Self, text: []const u8) !void {
         const allocator = self.arena_impl.allocator();
         self._text = text;
-        var font_size: f16 = @floatFromInt(self.font_size);
+        const box_size = self._box.getSize();
+        var font_size = self.font_size;
         if (!self.wrap) {
             font_size = @floatFromInt(getPreferredFontSize(
-                self.box.getSize(),
+                box_size,
                 text,
                 self.font,
                 constants.TEXT_SPACING_RATIO,
                 null
             ));
             font_size *= 0.9;
-            self.font_size = @intFromFloat(font_size);
+            self.font_size = font_size;
         }
 
         // update box size
-        const box_size = self.box.getSize();
         var m_size = measureTextBoxSize(
             text,
             self.font,
@@ -174,14 +177,14 @@ pub const Label = struct {
     pub fn _wrapText(self: *Self, text: []const u8) ![]u8 {
         const allocator = self.arena_impl.allocator();
         const font = self.font;
-        const font_size: f32 = @floatFromInt(self.font_size);
+        const font_size = self.font_size;
         const line_height = font_size;
         const spacing = font_size * constants.TEXT_SPACING_RATIO;
         
         var res_text = try allocator.alloc(u8, text.len * 2 + 1);
         @memset(res_text, 0);
         
-        const box_size = self.box.getSize();
+        const box_size = self._box.getSize();
         const width = box_size[0];
         const height = box_size[1];
         if (width == 0) {
@@ -239,17 +242,17 @@ pub const Label = struct {
     }
 
     pub fn draw(self: *Self, outer_offset: Vector2) void {
-        r.SetTextLineSpacing(self.font_size);
+        r.SetTextLineSpacing((@intFromFloat(self.font_size)));
         self.box.draw(outer_offset);
         const offset = outer_offset + self.box.getOffset();
-        const spacing = @as(f16, @floatFromInt(self.font_size)) * constants.TEXT_SPACING_RATIO;
+        const spacing = self.font_size * constants.TEXT_SPACING_RATIO;
         r.DrawTextEx(
             self.font,
             @ptrCast(self.text),
-            util.V2toRV2(offset +
-                    @as(Vector2, @splat(@as(f16, @floatFromInt(self.font_size))))
+            util.V2toRV2(
+                offset + @as(Vector2, @splat(self.font_size))
                     * Vector2 { 0.05, 0.05 }),
-            @floatFromInt(self.font_size),
+            self.font_size,
             spacing,
             self.fg_color
         );

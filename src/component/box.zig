@@ -52,11 +52,11 @@ pub const ColorBox = struct {
         };
     }
 
-    pub inline fn getOffset(self: *Self) Vector2 {
+    pub inline fn getOffset(self: Self) Vector2 {
         return self.box.offset;
     }
 
-    pub inline fn getSize(self: *Self) Vector2 {
+    pub inline fn getSize(self: Self) Vector2 {
         return self.box.size;
     }
 

@@ -35,8 +35,8 @@ pub const Label = struct {
     _box: ColorBox, // original box
     box: ColorBox, // calculated box
     fg_color: r.Color,
-    _text: []const u8, // original text
-    text: []const u8, // display text (may be modified)
+    _text: [:0]const u8, // original text
+    text: [:0]const u8, // display text (may be modified)
     font_size: f16 = undefined,
     font: r.Font,
     wrap: bool = false,
@@ -49,7 +49,7 @@ pub const Label = struct {
         size: Vector2,
         bg_color: r.Color,
         fg_color: r.Color,
-        text: []const u8,
+        text: [:0]const u8,
         font: r.Font,
     ) !Self {
         var label: Self = .{
@@ -74,7 +74,7 @@ pub const Label = struct {
         size: Vector2,
         bg_color: r.Color,
         fg_color: r.Color,
-        text: []const u8,
+        text: [:0]const u8,
         font: r.Font,
         font_size: f16,
         compact: bool, // TODO
@@ -102,8 +102,9 @@ pub const Label = struct {
         allocator.destroy(self.arena_impl);
     }
 
-    pub fn updateText(self: *Self, text: []const u8) !void {
+    pub fn updateText(self: *Self, raw_text: []const u8) !void {
         const allocator = self.arena_impl.allocator();
+        var text = try allocator.dupeZ(u8, raw_text);
         self._text = text;
         const box_size = self._box.getSize();
         var font_size = self.font_size;
@@ -135,15 +136,11 @@ pub const Label = struct {
         }
 
         // wrap mode with at least one field of box_size is 0.0
-        var adjusted_text = try allocator.alloc(u8, text.len + 1);
-        @memset(adjusted_text, 0);
-        @memcpy(adjusted_text[0..text.len], text);
-        
         if (box_size[0] == 0) { // height check for wrap mode
             while (res_size[1] > box_size[1]) {
-                trimLastLineC(&adjusted_text, null);
+                trimLastLineC(&text, null);
                 m_size = measureTextBoxSize(
-                    adjusted_text,
+                    text,
                     self.font,
                     font_size,
                     constants.TEXT_SPACING_RATIO,
@@ -156,14 +153,14 @@ pub const Label = struct {
             } else {
                 self.box.setSize(.{res_size[0], box_size[1]});
             }
-            self.text = adjusted_text;
+            self.text = text;
             return;
         }
 
-        adjusted_text = try self._wrapText(text);
+        text = try self._wrapText(text);
         if (self.compact) {
             m_size = measureTextBoxSize(
-                adjusted_text,
+                text,
                 self.font,
                 font_size,
                 constants.TEXT_SPACING_RATIO,
@@ -173,22 +170,24 @@ pub const Label = struct {
             self.box.setSize(res_size);
         }
         // self.arena_impl.reset(.retain_capacity);
-        self.text = adjusted_text;
+        self.text = text;
     }
 
     /// wrap text according to box width (return a new string)
     /// box width should be set before calling this method
     /// if the height exceeding the box height, then the trailing characters
     /// won't be included
-    pub fn _wrapText(self: *Self, text: []const u8) ![]u8 {
+    pub fn _wrapText(self: *Self, text: []const u8) ![:0]u8 {
         const allocator = self.arena_impl.allocator();
         const font = self.font;
         const font_size = self.font_size;
         const line_height = font_size;
         const spacing = font_size * constants.TEXT_SPACING_RATIO;
-        
-        var res_text = try allocator.alloc(u8, text.len * 2 + 1);
-        @memset(res_text, 0);
+
+        const res_text_len = text.len * 2 + 1;
+        var temp_res_text = try allocator.alloc(u8, res_text_len);
+        @memset(temp_res_text, 0);
+        var res_text: [:0]u8 = temp_res_text[0..res_text_len - 1: 0];
         
         const box_size = self._box.getSize();
         const width = box_size[0];
@@ -198,6 +197,7 @@ pub const Label = struct {
             return res_text;   
         }
 
+        // const length = text.len;
         const length = r.TextLength(@ptrCast(text)); // Total length in bytes of the text
         var offset_x: f32 = 0;
         var offset_y: f32 = line_height; // line bottom offset

@@ -127,6 +127,7 @@ pub const MainScreen = struct {
     }
 
     fn _authenticate(self: *Self, req: Request) !void {
+        const allocator = self.arena_impl.allocator();
         try self.gipc.sendMsg(req);
         const resp = try self.gipc.readMsg();
         switch (resp) {
@@ -147,16 +148,8 @@ pub const MainScreen = struct {
                 }
             },
             .err => |err| {
-                // handle error
-                _ = err;
-                // switch (err.err_type) {
-                //     .auth_error => {
-                //         res = LoginResult.failure;
-                //     },
-                //     .@"error" => {
-                //         try stderr.print("login error: {s}", .{err.description});
-                //     }
-                // }
+                // don't care about err_type
+                try self.log.updateText((try allocator.dupeZ(u8, err.description))[0..]);
             },
             .auth_message => |auth_msg| {
                 switch (auth_msg.auth_message_type) {

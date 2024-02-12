@@ -14,6 +14,8 @@ pub const Config = struct {
     _frames_per_key_down: u8 = undefined,
     window_name: []const u8 = "RayGreet",
     fps: u8 = 60,
+    // the command to run after a successful authentication
+    cmd: []const u8 = "/bin/sh",  // default is to enter into a terminal session
     /// seconds
     keydown_speed: f16 = 0.1,
     cursor: CursorOption = CursorOption {},

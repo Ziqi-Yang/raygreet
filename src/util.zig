@@ -38,4 +38,3 @@ pub fn upperCaseChar(char: u8) u8 {
         else => char
     };
 }
-

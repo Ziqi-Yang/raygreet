@@ -2,6 +2,8 @@ const RayGreetScreen = @import("screen.zig").RayGreetScreen;
 
 pub const MAX_KEY_PRESSED = 16; // raylib, maximum number of pressed keys in current frame
 
+pub var should_close_window = false;
+
 pub var current_screen: RayGreetScreen = undefined;
 
 /// Not actual caps lock's status, it only stands for caps lock's status in this application

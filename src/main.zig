@@ -65,7 +65,7 @@ pub fn main() !void {
         .main_screen = &screen.main_screen,
     };
     
-    while (!r.WindowShouldClose()) {
+    while (!r.WindowShouldClose() and !status.should_close_window) {
         handleKey();
         r.BeginDrawing();
         try status.current_screen.draw();

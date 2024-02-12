@@ -1,13 +1,12 @@
 const std = @import("std");
 const r = @cImport(@cInclude("raylib.h"));
 const Vector2 = @import("../util.zig").Vector2;
-const Cursor = @import("../component/cursor.zig").Cursor;
-const CursorOption = @import("../config.zig").CursorOption;
+const config = @import("../config.zig");
 const i_text = @import("../component/text.zig");
 const InputTextField = i_text.InputTextField;
 const Label = i_text.Label;
-
 const ArenaAllocator = std.heap.ArenaAllocator;
+const status = @import("../status.zig");
 
 const greetd_ipc = @import("greetd_ipc");
 const GreetdIPC = greetd_ipc.GreetdIPC;
@@ -26,14 +25,16 @@ pub const MainScreen = struct {
     screen_size: Vector2,
     arena_impl: *ArenaAllocator,
     gipc: GreetdIPC,
-    
+    cmd: []const u8, // corresponding to config.Config.cmd field
+
+    _user_name: []const u8, // entered user name
+
     input_text_field: InputTextField,
     title: Label,
-    log: Label,
+    log: Label, // error log
 
     const title_offset = Vector2 { 0.05, 0.075 };
     const input_text_field_offset = Vector2 { 0.15, 0.25 };
-    var error_log: ?[]const u8 = null;
 
     pub fn new(allocator: std.mem.Allocator) !Self {
         if (!r.IsWindowReady()) return error.WindowNotInitialized;
@@ -41,6 +42,8 @@ pub const MainScreen = struct {
         const SCREEN_WIDTH: f16 = @floatFromInt(@as(u16, @intCast(r.GetScreenWidth())));
         const SCREEN_HEIGHT: f16 = @floatFromInt(@as(u16, @intCast(r.GetScreenHeight())));
         const input_text_field_box_size: Vector2 = .{ SCREEN_WIDTH * 0.7, SCREEN_HEIGHT / 2};
+
+        const CONFIG = config.get_config();
         
         const title_box_size: Vector2 = .{ 0.0, SCREEN_HEIGHT * 0.1 }; // don't limit the width
         const title = try Label.new(
@@ -59,14 +62,16 @@ pub const MainScreen = struct {
                 allocator,
                 .{ SCREEN_WIDTH * 0.9 - title.box.getSize()[0], title.box.getSize()[1] },
                 r.BLANK,
-                r.LIGHTGRAY,
+                r.MAROON,
                 "",
                 r.GetFontDefault(),
                 title.font_size / 4,
                 true
             ),
             .arena_impl = try allocator.create(ArenaAllocator),
-            .gipc = try GreetdIPC.new(null, allocator)
+            .gipc = try GreetdIPC.new(null, allocator),
+            .cmd = CONFIG.cmd,
+            ._user_name = undefined,
         };
         main_screen.arena_impl.* = ArenaAllocator.init(allocator);
         return main_screen;
@@ -89,6 +94,30 @@ pub const MainScreen = struct {
         self.log.deinit();
     }
 
+    fn recalculateLogSizeOffset(self: *Self) !void {
+        const title_size = self.title.box.getSize();
+        const size = .{self.screen_size[0] * 0.9 - title_size[0], title_size[1]};
+        try self.log.updateBox(null, size);
+    }
+
+    /// update the title text, also recalculate the log box size & offset
+    fn updateTitle(self: *Self, title: []const u8) !void {
+        try self.title.updateText(title);
+        try self.recalculateLogSizeOffset();
+    }
+
+    fn updateLog(self: *Self, log: []const u8) !void {
+        if (log.len == 0 or log[0] == 0) { // clear log (we also need to clean color)
+            self.title.setBgColor(r.DARKGRAY);
+        } else {
+            self.title.setBgColor(r.MAROON);
+        }
+        
+        try self.log.updateText(log);
+        // since log is in compact mode, we also need to update the log offset
+        try self.recalculateLogSizeOffset();
+    }
+
     pub fn draw(self: *Self) !void {
         r.ClearBackground(r.RAYWHITE);
         const response: ?Response = switch (self.state) {
@@ -99,18 +128,22 @@ pub const MainScreen = struct {
             }
         };
         _ = response;
-        const title_position = self.screen_size * title_offset ;
+        const title_position = self.screen_size * title_offset;
         self.title.draw(title_position);
+        
+        const title_size = self.title.box.getSize();
+        const log_size = self.log.box.getSize();
+        const t_btm_r = title_position + title_size;
+        self.log.draw(t_btm_r - Vector2 { 0.0, log_size[1]});
+        
         self.input_text_field.draw( self.screen_size * input_text_field_offset );
-        // if (error_log) |log| {
-        // }
     }
 
     fn updateState(self: *Self, state: State) !void {
         const arena = self.arena_impl.allocator();
         switch (state) {
             .input_user => {
-                try self.title.updateText("USERNAME");
+                try self.updateTitle("USERNAME");
             },
             .answer_question => | resp | {
                 switch (resp.?.auth_message.auth_message_type) {
@@ -119,7 +152,7 @@ pub const MainScreen = struct {
                     else => {}
                 }
                 const text = try arena.dupeZ(u8, resp.?.auth_message.auth_message);
-                try self.title.updateText(text);
+                try self.updateTitle(text);
             }
         }
         self.input_text_field.reset();
@@ -134,22 +167,33 @@ pub const MainScreen = struct {
             .success => {
                 switch (req) {
                     .create_session => {
+                        // normally greetd won't return a success message for this type of request
                         // TODO test a user without password
                     },
                     .post_auth_message_response => {
                         // start session
-                        // TODO 
+                        const request = .{ .start_session = .{
+                            .cmd = &.{ self.cmd },
+                            .env = &.{}
+                        }};
+                        try self._authenticate(request);
                     },
-                    .start_session,
-                    .cancel_session => {
+                    .start_session => {
                         // exit
-                        r.CloseWindow();
+                        status.should_close_window = true;
+                    },
+                    .cancel_session => {
+                        const request: Request = .{ .create_session = .{ .username = self._user_name }};
+                        try self._authenticate(request);
                     },
                 }
             },
             .err => |err| {
                 // don't care about err_type
-                try self.log.updateText((try allocator.dupeZ(u8, err.description))[0..]);
+                try self.updateLog(try allocator.dupeZ(u8, err.description));
+                // cancel session
+                const request: Request = .{ .cancel_session = .{} };
+                try self._authenticate(request);
             },
             .auth_message => |auth_msg| {
                 switch (auth_msg.auth_message_type) {
@@ -170,9 +214,11 @@ pub const MainScreen = struct {
 
     pub fn authenticate(self: *Self) !void {
         const arena = self.arena_impl.allocator();
+        try self.updateLog(""); // clean log
         switch (self.state) {
             .input_user => {
                 const text = try self.input_text_field.getTextAlloc(arena);
+                self._user_name = text;
 
                 const req: Request = .{ .create_session = .{ .username = text }};
                 try self._authenticate(req);

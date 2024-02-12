@@ -102,6 +102,22 @@ pub const Label = struct {
         allocator.destroy(self.arena_impl);
     }
 
+    pub inline fn setBgColor(self: *Self, color: r.Color) void {
+        self.box.bg_color = color;
+    }
+
+    pub fn updateBox(self: *Self, offset: ?Vector2, size: ?Vector2) !void {
+        if (offset) |o| {
+            self._box.setOffset(o);   
+            self.box.setOffset(o);
+        }
+        if (size) |s| {
+            self._box.setSize(s);   
+            self.box.setSize(s);
+        }
+        try self.updateText(self._text);
+    }
+
     pub fn updateText(self: *Self, raw_text: []const u8) !void {
         const allocator = self.arena_impl.allocator();
         var text = try allocator.dupeZ(u8, raw_text);

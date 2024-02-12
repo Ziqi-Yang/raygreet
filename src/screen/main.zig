@@ -3,8 +3,8 @@ const r = @cImport(@cInclude("raylib.h"));
 const Vector2 = @import("../util.zig").Vector2;
 const Cursor = @import("../component/cursor.zig").Cursor;
 const CursorOption = @import("../config.zig").CursorOption;
-const InputTextField = @import("../component/input_text_field.zig").InputTextField;
 const i_text = @import("../component/text.zig");
+const InputTextField = i_text.InputTextField;
 const Label = i_text.Label;
 
 const ArenaAllocator = std.heap.ArenaAllocator;

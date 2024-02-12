@@ -30,9 +30,12 @@ pub const MainScreen = struct {
     _user_name: []const u8, // entered user name
 
     input_text_field: InputTextField,
+    // this is added mostly because the confusion when error ( password red with log message "nope")
+    user_name_indicator: Label,
     title: Label,
     log: Label, // error log
 
+    const user_name_indicator_offset = Vector2 { 0.05, 0.075 * 2.5 / 4.0 };
     const title_offset = Vector2 { 0.05, 0.075 };
     const input_text_field_offset = Vector2 { 0.15, 0.25 };
 
@@ -57,6 +60,14 @@ pub const MainScreen = struct {
         const main_screen = .{
             .screen_size = .{ SCREEN_WIDTH, SCREEN_HEIGHT },
             .input_text_field = try InputTextField.new(input_text_field_box_size, .visible, null),
+            .user_name_indicator = try Label.new(
+                allocator,
+                title_box_size / Vector2 {4, 4},
+                r.BLANK,
+                r.DARKGRAY,
+                "",
+                r.GetFontDefault()
+            ),
             .title = title,
             .log = try Label.newFixedSize(
                 allocator,
@@ -90,6 +101,7 @@ pub const MainScreen = struct {
         self.arena_impl.deinit();
         allocator.destroy(self.arena_impl);
         self.gipc.deinit();
+        self.user_name_indicator.deinit();
         self.title.deinit();
         self.log.deinit();
     }
@@ -109,8 +121,10 @@ pub const MainScreen = struct {
     fn updateLog(self: *Self, log: []const u8) !void {
         if (log.len == 0 or log[0] == 0) { // clear log (we also need to clean color)
             self.title.setBgColor(r.DARKGRAY);
+            self.user_name_indicator.fg_color = r.DARKGRAY;
         } else {
             self.title.setBgColor(r.MAROON);
+            self.user_name_indicator.fg_color = r.MAROON;
         }
         
         try self.log.updateText(log);
@@ -118,8 +132,18 @@ pub const MainScreen = struct {
         try self.recalculateLogSizeOffset();
     }
 
+    pub fn handleInput(self: *Self) !void {
+        if (r.IsKeyPressed(r.KEY_ESCAPE)) {
+            try self.updateLog("");
+            try self.update_user_name("");
+            const state = .{ .input_user = null };
+            try self.updateState(state);
+        }
+    }
+
     pub fn draw(self: *Self) !void {
         r.ClearBackground(r.RAYWHITE);
+        try self.handleInput();
         const response: ?Response = switch (self.state) {
             inline else => |*v| blk: {
                 const old = v.*;
@@ -128,6 +152,9 @@ pub const MainScreen = struct {
             }
         };
         _ = response;
+        const user_name_indicator_position = self.screen_size * user_name_indicator_offset;
+        self.user_name_indicator.draw(user_name_indicator_position);
+
         const title_position = self.screen_size * title_offset;
         self.title.draw(title_position);
         
@@ -210,6 +237,17 @@ pub const MainScreen = struct {
                 }
             }
         }
+    }
+
+    fn update_user_name(self: *Self, name: []const u8) !void {
+        const allocator = self.arena_impl.allocator();
+        self._user_name = name;
+        if (name.len != 0 and name[0] != 0) {
+            const text = try std.mem.concat(allocator, u8, &.{"Username: ", name});
+            try self.user_name_indicator.updateText(text);
+            return;
+        }
+        try self.user_name_indicator.updateText(name);
     } 
 
     pub fn authenticate(self: *Self) !void {
@@ -218,7 +256,7 @@ pub const MainScreen = struct {
         switch (self.state) {
             .input_user => {
                 const text = try self.input_text_field.getTextAlloc(arena);
-                self._user_name = text;
+                try self.update_user_name(text);
 
                 const req: Request = .{ .create_session = .{ .username = text }};
                 try self._authenticate(req);

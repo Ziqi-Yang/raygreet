@@ -51,10 +51,12 @@ pub fn main() !void {
     log.info("Reading configuration at {s}", .{config.CONFIG_FILE_PATH});
     const CONFIG = try config.parse_config(arena);
 
+
     // initialize screen
     
     // std.debug.print("{}", .{@TypeOf(.{WINDOW_WIDTH, WINDOW_HEIGHT})});
     r.InitWindow(0, 0, @ptrCast(CONFIG.window_name));
+    r.SetExitKey(r.KEY_NULL); // disable default ESC -> exit window behavior
     defer r.CloseWindow();
     r.SetTargetFPS(CONFIG.fps);
     

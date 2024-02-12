@@ -269,6 +269,12 @@ pub const Label = struct {
 pub const InputTextField = struct {
     const Self = @This();
     const MAX_TEXT_LEN = 255;
+    const INVISIBLE_MASK_CHAR = '*';
+
+    const Mode = enum {
+        visible,
+        invisible,
+    };
 
     const PopChar = struct {
         var key_down_counter: u8 = 0;
@@ -297,13 +303,15 @@ pub const InputTextField = struct {
     const POP_ALL = PopAll {};
     const KEY_BACKSPACE_POP_CHAR = PopChar {};
 
-    text: [MAX_TEXT_LEN: 0]u8 = [_: 0]u8{0} ** MAX_TEXT_LEN,
+    _text: [MAX_TEXT_LEN: 0]u8 = [_: 0]u8{0} ** MAX_TEXT_LEN, // original text
+    text: [MAX_TEXT_LEN: 0]u8 = [_: 0]u8{0} ** MAX_TEXT_LEN, // text to display
     _text_index: u8 = 0,
     box: Box,
     cursor: Cursor,
     font: r.Font,
     font_size: f16,
     color: r.Color = r.DARKGRAY,
+    mode: Mode,
     frames_per_key_down: u8,
     func_enter_key_down: ?*const fn () void,
     
@@ -312,6 +320,7 @@ pub const InputTextField = struct {
     /// default font)
     pub fn new(
         box_size: Vector2,
+        mode: Mode,
         func_enter_key_down: ?*const fn () void
     ) !Self {
         if (!r.IsWindowReady()) return error.WindowNotInitialized;
@@ -332,11 +341,24 @@ pub const InputTextField = struct {
                 .size = box_size
             },
             .cursor = cursor,
+            .mode = mode,
             .frames_per_key_down = CONFIG._frames_per_key_down,
             .func_enter_key_down = func_enter_key_down
         };
         res.update();
         return res;
+    }
+
+    pub fn setMode(self: *Self, mode: Mode) void {
+        switch (mode) {
+            .visible => {
+                @memcpy(&self.text, &self._text);
+            },
+            .invisible => {
+                @memset(self.text[0..self._text_index], INVISIBLE_MASK_CHAR);
+            }
+        }
+        self.mode = mode;
     }
 
     /// update font_size, offset, cursor field
@@ -369,7 +391,7 @@ pub const InputTextField = struct {
     }
 
     pub fn getTextAlloc(self: *Self, allocator: std.mem.Allocator) ![]u8 {
-        return allocator.dupe(u8, self.text[0..self._text_index]);
+        return allocator.dupe(u8, self._text[0..self._text_index]);
     }
 
     /// return whether push success (the reason to fail: size full) and update
@@ -378,7 +400,11 @@ pub const InputTextField = struct {
         if (self._text_index >= self.text.len) {
             return false;
         } 
-        self.text[self._text_index] = char;
+        self._text[self._text_index] = char;
+        self.text[self._text_index] = switch (self.mode) {
+            .visible => char,
+            .invisible => INVISIBLE_MASK_CHAR
+        };
         self._text_index += 1;
         self.update();
         self.cursor.resetBlink();
@@ -391,17 +417,18 @@ pub const InputTextField = struct {
             return null;
         }
         self._text_index -= 1;
-        const old_char = self.text[self._text_index];
-        self.text[self._text_index] = '\x00';
+        const old_char = self._text[self._text_index];
+        self._text[self._text_index] = 0;
+        self.text[self._text_index] = 0;
         self.update();
         self.cursor.resetBlink();
         return old_char;
     }
 
     pub fn reset(self: *Self) void {
-        while (self._text_index > 0) : (self._text_index -= 1) {
-            self.text[self._text_index - 1] = '\x00';
-        }
+        @memset(self._text[0..self._text_index], 0);
+        @memset(self.text[0..self._text_index], 0);
+        self._text_index = 0;
         self.update();
     }
 

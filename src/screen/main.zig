@@ -53,7 +53,7 @@ pub const MainScreen = struct {
         );
         const main_screen = .{
             .screen_size = .{ SCREEN_WIDTH, SCREEN_HEIGHT },
-            .input_text_field = try InputTextField.new(input_text_field_box_size, null),
+            .input_text_field = try InputTextField.new(input_text_field_box_size, .visible, null),
             .title = title,
             .log = try Label.newFixedSize(
                 allocator,
@@ -113,6 +113,11 @@ pub const MainScreen = struct {
                 try self.title.updateText("USERNAME");
             },
             .answer_question => | resp | {
+                switch (resp.?.auth_message.auth_message_type) {
+                    .visible => self.input_text_field.setMode(.visible),
+                    .secret => self.input_text_field.setMode(.invisible),
+                    else => {}
+                }
                 const text = try arena.dupeZ(u8, resp.?.auth_message.auth_message);
                 try self.title.updateText(text);
             }

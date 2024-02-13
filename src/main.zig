@@ -56,7 +56,7 @@ pub fn main() !void {
     
     // std.debug.print("{}", .{@TypeOf(.{WINDOW_WIDTH, WINDOW_HEIGHT})});
     r.InitWindow(0, 0, @ptrCast(CONFIG.window_name));
-    r.SetExitKey(r.KEY_NULL); // disable default ESC -> exit window behavior
+    // r.SetExitKey(r.KEY_NULL); // disable default ESC -> exit window behavior
     defer r.CloseWindow();
     r.SetTargetFPS(CONFIG.fps);
     
@@ -96,13 +96,16 @@ fn handleKey() void {
     {
         var i: u8 = 0;
         while (i < status.MAX_KEY_PRESSED) {
-            const key = r.GetCharPressed();
-            if (key == 0) {
+            const char = r.GetCharPressed();
+            if (char == 0) {
                 status.cur_pressed_chars[i] = null;
                 break;
+            } else if (char > 0 and char < 256)  {
+                // it seems like `HOME` key in drm mode will also be treated (number less that 0)
+                // and `END` is a large number
+                status.cur_pressed_chars[i] = @intCast(char);
+                i += 1;
             }
-            status.cur_pressed_chars[i] = @intCast(key);
-            i += 1;
         }
     }
 

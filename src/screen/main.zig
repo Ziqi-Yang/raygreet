@@ -170,7 +170,7 @@ pub const MainScreen = struct {
         const arena = self.arena_impl.allocator();
         switch (state) {
             .input_user => {
-                try self.updateTitle("USERNAME");
+                try self.updateTitle("Username:");
             },
             .answer_question => | resp | {
                 switch (resp.?.auth_message.auth_message_type) {

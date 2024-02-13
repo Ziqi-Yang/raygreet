@@ -56,6 +56,7 @@ pub fn main() !void {
     
     // std.debug.print("{}", .{@TypeOf(.{WINDOW_WIDTH, WINDOW_HEIGHT})});
     r.InitWindow(0, 0, @ptrCast(CONFIG.window_name));
+    // FIXME
     // r.SetExitKey(r.KEY_NULL); // disable default ESC -> exit window behavior
     defer r.CloseWindow();
     r.SetTargetFPS(CONFIG.fps);

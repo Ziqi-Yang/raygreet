@@ -1,4 +1,5 @@
 const std = @import("std");
+// don't use raylib library in system package, since it is meant to be used for DESKTOP, not DRM
 const raySdk = @import("lib/raylib/src/build.zig");
 
 fn addDependencyModules(

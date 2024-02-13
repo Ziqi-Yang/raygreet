@@ -49,7 +49,7 @@ pub const MainScreen = struct {
         const CONFIG = config.get_config();
         
         const title_box_size: Vector2 = .{ 0.0, SCREEN_HEIGHT * 0.1 }; // don't limit the width
-        const title = try Label.new(
+        var title = try Label.new(
             allocator,
             title_box_size,
             r.DARKGRAY,
@@ -57,33 +57,42 @@ pub const MainScreen = struct {
             "Username:",
             r.GetFontDefault()
         );
-        const main_screen = .{
+        var user_name_indicator = try Label.new(
+            allocator,
+            title_box_size / Vector2 {4, 4},
+            r.BLANK,
+            r.DARKGRAY,
+            "",
+            r.GetFontDefault()
+        );
+        var log = try Label.newFixedSize(
+            allocator,
+            .{ SCREEN_WIDTH * 0.9 - title.box.getSize()[0], title.box.getSize()[1] },
+            r.BLANK,
+            r.MAROON,
+            "",
+            r.GetFontDefault(),
+            title.font_size / 4,
+            true
+        );
+        var main_screen: Self = .{
             .screen_size = .{ SCREEN_WIDTH, SCREEN_HEIGHT },
             .input_text_field = try InputTextField.new(input_text_field_box_size, .visible, null),
-            .user_name_indicator = try Label.new(
-                allocator,
-                title_box_size / Vector2 {4, 4},
-                r.BLANK,
-                r.DARKGRAY,
-                "",
-                r.GetFontDefault()
-            ),
+            .user_name_indicator = user_name_indicator,
             .title = title,
-            .log = try Label.newFixedSize(
-                allocator,
-                .{ SCREEN_WIDTH * 0.9 - title.box.getSize()[0], title.box.getSize()[1] },
-                r.BLANK,
-                r.MAROON,
-                "",
-                r.GetFontDefault(),
-                title.font_size / 4,
-                true
-            ),
+            .log = log,
             .arena_impl = try allocator.create(ArenaAllocator),
-            .gipc = try GreetdIPC.new(null, allocator),
+            .gipc = undefined,
             .cmd = CONFIG.cmd,
             ._user_name = undefined,
         };
+        errdefer {
+            title.deinit();
+            user_name_indicator.deinit();
+            log.deinit();
+            allocator.destroy(main_screen.arena_impl);
+        }
+        main_screen.gipc = try GreetdIPC.new(null, allocator);
         main_screen.arena_impl.* = ArenaAllocator.init(allocator);
         return main_screen;
     }

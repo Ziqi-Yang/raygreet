@@ -12,10 +12,10 @@ var _config: ?Config = null;
 
 pub const Config = struct {
     _frames_per_key_down: u8 = undefined,
-    window_name: []const u8 = "RayGreet",
+    window_name: []u8 = @constCast("RayGreet"),
     fps: u8 = 60,
     // the command to run after a successful authentication
-    cmd: []const u8 = "/bin/sh",  // default is to enter into a terminal session
+    cmd: []u8 = @constCast("/bin/sh"),  // default is to enter into a terminal session
     /// seconds
     keydown_speed: f16 = 0.1,
     cursor: CursorOption = CursorOption {},
@@ -87,8 +87,9 @@ test "parse config" {
 
     try std.testing.expectEqualStrings("RayGreet", my_json.window_name);
     try std.testing.expectEqual(30, my_json.fps);
-    try std.testing.expectEqual(0, my_json.cursor.blink);
+    try std.testing.expectEqual(18, my_json.cursor._blink);
     try std.testing.expectEqual(CursorType.Hbar, my_json.cursor.type);
     try std.testing.expectEqual(3, my_json._frames_per_key_down);
+    try std.testing.expectEqualStrings("/bin/bash", my_json.cmd);
 }
 

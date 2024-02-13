@@ -1,15 +1,19 @@
 run:
     fakegreet "zig build run"
 
-release-drm:
-    zig build -Doptimize=ReleaseSafe -Dplatform_drm
+run-drm:
+    sudo zig build -Dplatform_drm
+    sudo chmod a+s ./zig-out/bin/raygreet
+    fakegreet "zig-out/bin/raygreet"
 
-release:
-    zig build -Doptimize=ReleaseSafe
+debug-drm:
+    sudo zig build -Dplatform_drm
+    sudo chmod a+s ./zig-out/bin/raygreet
+
+release-drm:
+    sudo zig build -Doptimize=ReleaseSafe -Dplatform_drm
+    sudo chmod a+s ./zig-out/bin/raygreet
 
 doc:
     pandoc -o ./README.md ./README.typ 
     
-drm:
-    zig build -Dplatform_drm
-    sudo fakegreet "zig-out/bin/raygreet"

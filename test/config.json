@@ -1,5 +1,6 @@
 {
   "fps": 30,
+  "cmd": "/bin/bash",
   "cursor": {
     "type": "Hbar"
   }

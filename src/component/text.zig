@@ -106,6 +106,16 @@ pub const Label = struct {
         self.box.bg_color = color;
     }
 
+    pub fn getTextAlloc(self: *Self, allocator: Allocator) ![]u8 {
+        // find c-string ending position
+        var index: usize = 0;
+        while (index < self._text.len) : (index += 1) {
+            if (self._text[index] == 0) break; 
+        }
+        
+        return try allocator.dupe(u8, self._text[0..index]);
+    }
+
     pub fn updateBox(self: *Self, offset: ?Vector2, size: ?Vector2) !void {
         if (offset) |o| {
             self._box.setOffset(o);   

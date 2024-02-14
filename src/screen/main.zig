@@ -7,6 +7,7 @@ const InputTextField = i_text.InputTextField;
 const Label = i_text.Label;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const status = @import("../status.zig");
+const builtin = @import("builtin");
 
 const greetd_ipc = @import("greetd_ipc");
 const GreetdIPC = greetd_ipc.GreetdIPC;
@@ -15,13 +16,13 @@ const Response = greetd_ipc.Response;
 
 pub const MainScreen = struct {
     pub const State = union(enum) {
-        input_user: ?Response, 
+        start: ?Response, 
         answer_question: ?Response,
     };
 
     const Self = @This();
 
-    state: State = .{ .input_user = null },
+    state: State = .{ .start = null },
     screen_size: Vector2,
     arena_impl: *ArenaAllocator,
     gipc: GreetdIPC,
@@ -54,7 +55,7 @@ pub const MainScreen = struct {
             title_box_size,
             r.DARKGRAY,
             r.LIGHTGRAY,
-            "Username:",
+            "User:",
             r.GetFontDefault()
         );
         var user_name_indicator = try Label.new(
@@ -75,6 +76,11 @@ pub const MainScreen = struct {
             title.font_size / 4,
             true
         );
+        errdefer {
+            title.deinit();
+            user_name_indicator.deinit();
+            log.deinit();
+        }
         var main_screen: Self = .{
             .screen_size = .{ SCREEN_WIDTH, SCREEN_HEIGHT },
             .input_text_field = try InputTextField.new(input_text_field_box_size, .visible, null),
@@ -84,14 +90,9 @@ pub const MainScreen = struct {
             .arena_impl = try allocator.create(ArenaAllocator),
             .gipc = undefined,
             .cmd = CONFIG.cmd,
-            ._user_name = undefined,
+            ._user_name = "",
         };
-        errdefer {
-            title.deinit();
-            user_name_indicator.deinit();
-            log.deinit();
-            allocator.destroy(main_screen.arena_impl);
-        }
+        errdefer allocator.destroy(main_screen.arena_impl);
         main_screen.gipc = try GreetdIPC.new(null, allocator);
         main_screen.arena_impl.* = ArenaAllocator.init(allocator);
         return main_screen;
@@ -141,16 +142,27 @@ pub const MainScreen = struct {
         try self.recalculateLogSizeOffset();
     }
 
-    pub fn handleInput(self: *Self) !void {
+    // If current state is still .start, then reset input text field
+    // otherwise cancel and restart authentication.
+    fn smartReset(self: *Self) !void {
+        try self.updateLog("");
+        try self.update_user_name("");
+
+        switch (self.state) {
+            .start => {
+                self.input_text_field.reset();
+            },
+            .answer_question => {
+                // cancel authentication attempt (and restart the authentication at `User:`)
+                const request: Request = .{ .cancel_session = .{} };
+                try self._authenticate(request);
+            }
+        }
+    }
+
+    fn handleInput(self: *Self) !void {
         if (r.IsKeyPressed(r.KEY_ESCAPE)) {
-            try self.updateLog("");
-            try self.update_user_name("");
-            
-            const request: Request = .{ .cancel_session = .{} };
-            try self._authenticate(request);
-            
-            const state = .{ .input_user = null };
-            try self.updateState(state);
+            try self.smartReset();
         }
     }
 
@@ -179,11 +191,13 @@ pub const MainScreen = struct {
         self.input_text_field.draw( self.screen_size * input_text_field_offset );
     }
 
+    /// Note that log is independently updated. This function doesn't clean log.
     fn updateState(self: *Self, state: State) !void {
         const arena = self.arena_impl.allocator();
         switch (state) {
-            .input_user => {
-                try self.updateTitle("Username:");
+            .start => {
+                try self.update_user_name("");
+                try self.updateTitle("User:");
             },
             .answer_question => | resp | {
                 switch (resp.?.auth_message.auth_message_type) {
@@ -199,22 +213,27 @@ pub const MainScreen = struct {
         self.state = state;
     }
 
+    var buf: std.ArrayListUnmanaged(u8) = .{}; // for debugging purpose
     fn _authenticate(self: *Self, req: Request) !void {
         const allocator = self.arena_impl.allocator();
         try self.gipc.sendMsg(req);
         const resp = try self.gipc.readMsg();
+
+        if (builtin.mode  == .Debug) {
+            buf.clearRetainingCapacity();
+            try buf.writer(allocator).print("req: {s}\nresp: {s}", .{std.json.fmt(req, .{}), std.json.fmt(resp, .{})});
+            try self.updateLog(buf.items);
+        }
+        
         switch (resp) {
             .success => {
                 switch (req) {
-                    .create_session => {
-                        // normally greetd won't return a success message for this type of request
-                        // TODO test a user without password
-                    },
+                    .create_session,
                     .post_auth_message_response => {
                         // start session
                         const request = .{ .start_session = .{
                             .cmd = &.{ self.cmd },
-                            .env = &.{}
+                            .env = &.{} // TODO
                         }};
                         try self._authenticate(request);
                     },
@@ -223,19 +242,38 @@ pub const MainScreen = struct {
                         status.should_close_window = true;
                     },
                     .cancel_session => {
-                        if (self._user_name.len != 0) { // not empty, important for `handleInput` function
-                            const request: Request = .{ .create_session = .{ .username = self._user_name }};
-                            try self._authenticate(request);
-                        }
+                        // cancel session means we need to restart the session
+                        try self.updateState(.{ .start = null });
                     },
                 }
             },
             .err => |err| {
-                // don't care about err_type
-                try self.updateLog(try allocator.dupeZ(u8, err.description));
-                // cancel session
-                const request: Request = .{ .cancel_session = .{} };
-                try self._authenticate(request);
+                // don't allow error redirect in Debug Mode
+                if (builtin.mode != .Debug) {
+                    switch (req) {
+                        // this mean greetd daemon should be in initial state, so sync the UI
+                        .cancel_session => {
+                            try self.updateState(.{ .start = null });
+                        },
+                        else => {
+                            switch (err.err_type) {
+                                .auth_error => {
+                                    try self.updateLog("Authorization Failed");
+                                },
+                                .@"error" => {
+                                    try self.updateLog(try allocator.dupeZ(u8, err.description));
+                                }
+                            }
+                            // NOTE this will cause `unable to send message (os 111)` error
+                            // and `post_auth_message_response` with `null` as `response` will
+                            // also cause this error
+                            // the correct way is assume daemon state was reset to initial
+                            // to we double cancel_session here to make sure the state is reset
+                            const request: Request = .{ .cancel_session = .{} };
+                            try self._authenticate(request);
+                        }
+                    }
+                }
             },
             .auth_message => |auth_msg| {
                 switch (auth_msg.auth_message_type) {
@@ -245,6 +283,7 @@ pub const MainScreen = struct {
                         try self.updateState(state);
                     },
                     else => {
+                        // TODO
                         switch (self.state) {
                             inline else => |*v| v.* = resp,
                         }
@@ -258,7 +297,7 @@ pub const MainScreen = struct {
         const allocator = self.arena_impl.allocator();
         self._user_name = name;
         if (name.len != 0 and name[0] != 0) {
-            const text = try std.mem.concat(allocator, u8, &.{"Username: ", name});
+            const text = try std.mem.concat(allocator, u8, &.{"User: ", name});
             try self.user_name_indicator.updateText(text);
             return;
         }
@@ -269,17 +308,21 @@ pub const MainScreen = struct {
         const arena = self.arena_impl.allocator();
         try self.updateLog(""); // clean log
         switch (self.state) {
-            .input_user => {
-                const text = try self.input_text_field.getTextAlloc(arena);
-                try self.update_user_name(text);
+            .start => {
+                const input = try self.input_text_field.getTextAlloc(arena);
+                try self.update_user_name(input);
 
-                const req: Request = .{ .create_session = .{ .username = text }};
+                const req: Request = .{ .create_session = .{ .username = input }};
                 try self._authenticate(req);
             },
             .answer_question => {
-                const text = try self.input_text_field.getTextAlloc(arena);
+                const input = try self.input_text_field.getTextAlloc(arena);
+                const title = try self.title.getTextAlloc(arena);
+                if (std.mem.eql(u8, title, "User:")) {
+                    try self.update_user_name(input);
+                }
 
-                const req: Request = .{ .post_auth_message_response = .{ .response = text} };
+                const req: Request = .{ .post_auth_message_response = .{ .response = input} };
                 try self._authenticate(req);
             },
         }

@@ -145,6 +145,10 @@ pub const MainScreen = struct {
         if (r.IsKeyPressed(r.KEY_ESCAPE)) {
             try self.updateLog("");
             try self.update_user_name("");
+            
+            const request: Request = .{ .cancel_session = .{} };
+            try self._authenticate(request);
+            
             const state = .{ .input_user = null };
             try self.updateState(state);
         }
@@ -219,8 +223,10 @@ pub const MainScreen = struct {
                         status.should_close_window = true;
                     },
                     .cancel_session => {
-                        const request: Request = .{ .create_session = .{ .username = self._user_name }};
-                        try self._authenticate(request);
+                        if (self._user_name.len != 0) { // not empty, important for `handleInput` function
+                            const request: Request = .{ .create_session = .{ .username = self._user_name }};
+                            try self._authenticate(request);
+                        }
                     },
                 }
             },

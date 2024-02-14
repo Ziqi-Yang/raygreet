@@ -66,5 +66,7 @@ sudo fakegreet "./zig-out/bin/raygreet"
     1. evdev key code:  /usr/share/X11/xkb/keycodes/evdev
     2. scancode: /usr/include/linux/input-event-codes.h
 
+= TODO
+  1. support choosing start session at runtime (and store the last choice)
 
 
